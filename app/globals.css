@@ -3,21 +3,73 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f2f0e9;
+  --foreground: #171716;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-width: 320px;
+  background: var(--background);
+  color: var(--foreground);
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: #ff5a36;
+  color: #171716;
+}
+
+@layer components {
+  /* Shared form control. Every form in the app styles its inputs with `.field`. */
+  .field {
+    @apply block w-full min-h-12 border border-ink/20 bg-white px-4 py-3 text-base text-ink
+           outline-none transition-colors placeholder:text-ink/35
+           focus:border-accent focus:ring-2 focus:ring-accent/25;
+  }
+
+  textarea.field {
+    @apply min-h-[7rem] leading-relaxed;
+  }
+
+  select.field {
+    @apply cursor-pointer appearance-none pr-10;
+  }
+
+  .field-label {
+    @apply mb-2 flex items-baseline justify-between gap-3 text-xs font-bold uppercase tracking-[0.14em] text-ink/65;
+  }
+
+  .field-error {
+    @apply mt-2 block text-xs font-medium text-red-700;
+  }
+
+  .form-alert {
+    @apply border border-red-700/30 bg-red-50 p-4 text-sm text-red-800;
+  }
+
+  .btn-primary {
+    @apply flex min-h-12 w-full items-center justify-center gap-2 bg-accent px-5 text-sm font-bold
+           uppercase tracking-[0.12em] text-ink transition-opacity
+           hover:opacity-90 disabled:cursor-wait disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply flex min-h-12 items-center justify-center gap-2 border border-ink/25 bg-transparent px-5
+           text-sm font-bold uppercase tracking-[0.12em] text-ink transition-colors
+           hover:border-ink/60 disabled:opacity-50;
+  }
+
+  .card {
+    @apply border border-ink/15 bg-white p-6 sm:p-8;
+  }
 }
 
 @layer utilities {
