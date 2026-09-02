@@ -341,6 +341,7 @@ The complete list is in `.env.example`:
 - `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`: public Supabase project connection values.
 - `SUPABASE_SERVICE_ROLE_KEY`: server-only key used for registrations, payment updates, and the admin view.
 - `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`: Razorpay credentials. The secret must remain server-only. See "Connecting your bank account (Razorpay)" below for how to get these.
+- `RAZORPAY_WEBHOOK_SECRET`: the secret you set on the Razorpay webhook, used to verify that deliveries to `/api/webhooks/razorpay` really came from Razorpay. Required for paid events — see the same section below.
 - `RESEND_API_KEY` and `RESEND_FROM_EMAIL`: confirmation email credentials and a verified sender address.
 - `ADMIN_PASSWORD`: shared password for `/admin`; use a long random value.
 - `SESSION_SECRET`: signs visitor login session cookies (`/signup`, `/login`, `/account`). Use a long random value, different from `ADMIN_PASSWORD`.
@@ -355,6 +356,16 @@ Razorpay is a payment aggregator, not a bank — payments collected through it s
 4. Once approved, switch to the **live** key pair and set `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` in your production environment (Vercel → Environment Variables). Never commit live keys.
 5. **UPI (QR code and UPI ID) needs no extra setup** — it's already wired in. Razorpay Checkout, which this app already opens for any paid event, shows a "Pay via UPI" tab by default with a scan-and-pay QR code, UPI ID (VPA) collect, and UPI intent for mobile — this project configures Checkout to show that tab first. UPI is enabled by default on Indian Razorpay accounts.
 6. Events priced at ₹0 always skip Razorpay entirely and are marked paid immediately — no keys required for free events.
+
+**Set up the webhook before taking real money.** A paid event only becomes a registration once the payment is confirmed. The browser reports that confirmation, but if the attendee's tab closes mid-payment the money would be taken with nothing recorded. The webhook is what closes that gap, because Razorpay calls it server-to-server and retries until it succeeds:
+
+1. Razorpay Dashboard → **Settings → Webhooks → Add New Webhook**.
+2. URL: `https://<your-domain>/api/webhooks/razorpay`
+3. Active event: **`payment.captured`** (`order.paid` is also accepted).
+4. Set a **secret** — any long random string you choose. This is *not* your key secret.
+5. Add that same value as `RAZORPAY_WEBHOOK_SECRET` in your environment variables (locally and in Vercel).
+
+The webhook and the browser callback both complete the same payment, and whichever arrives first creates the row — writes are keyed on the Razorpay order id, so a duplicate delivery, a retry, or a reloaded success page cannot create a second registration or send a second confirmation email.
 
 Full technical detail (files involved, request flow, security model) is in [ARCHITECTURE_PAYMENTS.md](ARCHITECTURE_PAYMENTS.md).
 

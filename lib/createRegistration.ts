@@ -39,12 +39,15 @@ export async function persistRegistration(params: {
   paymentStatus: "paid";
   razorpayOrderId?: string | null;
   paymentId?: string | null;
-}): Promise<{ registrationId?: string; error?: string }> {
+  // `created` distinguishes a fresh row from one an earlier call already made,
+  // so the confirmation email is sent once even though the browser callback and
+  // the webhook both complete the same payment.
+}): Promise<{ registrationId?: string; created?: boolean; error?: string }> {
   const { input, resolved, userId, razorpayOrderId = null, paymentId = null } = params;
 
   if (isDevStoreEnabled()) {
     const existing = razorpayOrderId ? devGetAllRegistrations().find((item) => item.razorpay_order_id === razorpayOrderId) : null;
-    if (existing) return { registrationId: existing.id };
+    if (existing) return { registrationId: existing.id, created: false };
 
     const registration = devCreateRegistration({
       event_id: resolved.event.id,
@@ -60,7 +63,7 @@ export async function persistRegistration(params: {
       registration_code: generateRegistrationCode(),
     });
     if (razorpayOrderId || paymentId) devSetRegistrationPaymentRefs(registration.id, razorpayOrderId, paymentId);
-    return { registrationId: registration.id };
+    return { registrationId: registration.id, created: true };
   }
 
   const supabase = getSupabaseAdminClient();
@@ -69,7 +72,7 @@ export async function persistRegistration(params: {
   // A retried callback (or a reloaded success page) must not create a second row.
   if (razorpayOrderId) {
     const { data: existing } = await supabase.from("registrations").select("id").eq("razorpay_order_id", razorpayOrderId).maybeSingle();
-    if (existing) return { registrationId: existing.id };
+    if (existing) return { registrationId: existing.id, created: false };
   }
 
   // A signed session can outlive the account it points at. Linking to a missing
@@ -103,7 +106,7 @@ export async function persistRegistration(params: {
     if (hasCodeColumn) row.registration_code = generateRegistrationCode();
 
     const { data, error } = await supabase.from("registrations").insert(row).select("id").single();
-    if (!error) return { registrationId: data.id };
+    if (!error) return { registrationId: data.id, created: true };
 
     if (error.code !== "23505") {
       console.error("Unable to create registration", error);
@@ -113,7 +116,7 @@ export async function persistRegistration(params: {
     // A duplicate on the order id means a concurrent callback already inserted it.
     if (razorpayOrderId) {
       const { data: existing } = await supabase.from("registrations").select("id").eq("razorpay_order_id", razorpayOrderId).maybeSingle();
-      if (existing) return { registrationId: existing.id };
+      if (existing) return { registrationId: existing.id, created: false };
     }
   }
 
