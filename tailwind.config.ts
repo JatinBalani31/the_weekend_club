@@ -8,16 +8,23 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // "Night Run" palette. Semantic names only - never use raw hex in components.
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        accent: "#ff5a36",
-        ink: "#171716",
-        paper: "#f2f0e9",
+        bg: "#0A0A0B",
+        surface: "#161618",
+        "surface-hover": "#1F1F23",
+        border: "#2A2A2F",
+        accent: "#C6F432",
+        "accent-hover": "#B2E01C",
+        text: "#FAFAFA",
+        "text-muted": "#A1A1AA",
+        success: "#22C55E",
+        error: "#EF4444",
       },
       fontFamily: {
-        display: ["var(--font-geist-sans)", "sans-serif"],
-        sans: ["var(--font-geist-sans)", "sans-serif"],
+        display: ["var(--font-display)", "sans-serif"],
+        body: ["var(--font-body)", "sans-serif"],
+        sans: ["var(--font-body)", "sans-serif"],
       },
     },
   },

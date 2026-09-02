@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import type { PublicUser } from "@/lib/users";
 import copy from "@/content/en.json";
 
@@ -31,39 +34,72 @@ export default function ProfileForm({ user }: { user: PublicUser }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="card space-y-6">
-      <Field label={copy.auth.name} error={errors.name?.message}>
-        <input {...register("name", { required: copy.auth.tellName })} autoComplete="name" className="field" />
-      </Field>
-      <Field label={copy.auth.email} error={errors.email?.message}>
-        <input {...register("email", { required: "Enter your email.", pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email." } })} autoComplete="email" type="email" className="field" />
-      </Field>
-      <Field label={copy.auth.mobileNumber} hint={copy.auth.indianNumber} error={errors.phone?.message}>
-        <input {...register("phone", { required: "Enter your phone number.", pattern: { value: /^(?:\+91[\s-]?)?[6-9]\d{9}$/, message: "Enter a valid Indian phone number." } })} autoComplete="tel" inputMode="tel" type="tel" className="field" />
-      </Field>
+    <Card>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+        <Input
+          label={copy.auth.name}
+          error={errors.name?.message}
+          autoComplete="name"
+          {...register("name", { required: copy.auth.tellName })}
+        />
+        <Input
+          label={copy.auth.email}
+          error={errors.email?.message}
+          autoComplete="email"
+          type="email"
+          {...register("email", { required: "Enter your email.", pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email." } })}
+        />
+        <Input
+          label={copy.auth.mobileNumber}
+          hint={copy.auth.indianNumber}
+          error={errors.phone?.message}
+          autoComplete="tel"
+          inputMode="tel"
+          type="tel"
+          {...register("phone", { required: "Enter your phone number.", pattern: { value: /^(?:\+91[\s-]?)?[6-9]\d{9}$/, message: "Enter a valid Indian phone number." } })}
+        />
 
-      <div className="border-t border-ink/15 pt-6">
-        <p className="text-xs font-bold uppercase tracking-wider text-ink/60">{copy.auth.changePassword} <span className="text-ink/40">{copy.common.optional}</span></p>
-        <div className="mt-4 space-y-6">
-          <Field label={copy.auth.newPassword} hint={copy.auth.atLeastEight} error={errors.newPassword?.message}>
-            <input {...register("newPassword", { minLength: { value: 8, message: "Use at least 8 characters." } })} autoComplete="new-password" type="password" className="field" placeholder="Leave blank to keep current" />
-          </Field>
-          {newPassword && (
-            <Field label={copy.auth.currentPassword} error={errors.currentPassword?.message}>
-              <input {...register("currentPassword", { required: "Enter your current password to change it." })} autoComplete="current-password" type="password" className="field" />
-            </Field>
-          )}
+        <div className="border-t border-border pt-6">
+          <p className="font-body text-xs font-bold uppercase tracking-[0.14em] text-text-muted">
+            {copy.auth.changePassword} <span className="text-text-muted/60">{copy.common.optional}</span>
+          </p>
+          <div className="mt-4 space-y-6">
+            <Input
+              label={copy.auth.newPassword}
+              hint={copy.auth.atLeastEight}
+              error={errors.newPassword?.message}
+              autoComplete="new-password"
+              type="password"
+              placeholder="Leave blank to keep current"
+              {...register("newPassword", { minLength: { value: 8, message: "Use at least 8 characters." } })}
+            />
+            {newPassword && (
+              <Input
+                label={copy.auth.currentPassword}
+                error={errors.currentPassword?.message}
+                autoComplete="current-password"
+                type="password"
+                {...register("currentPassword", { required: "Enter your current password to change it." })}
+              />
+            )}
+          </div>
         </div>
-      </div>
 
-      {submitError && <p role="alert" className="form-alert">{submitError}</p>}
-      {savedMessage && <p role="status" className="border border-green-700/30 bg-green-50 p-4 text-sm text-green-800">{savedMessage}</p>}
+        {submitError && (
+          <p role="alert" className="rounded-xl border border-error/40 bg-error/10 p-4 font-body text-sm text-error">
+            {submitError}
+          </p>
+        )}
+        {savedMessage && (
+          <p role="status" className="rounded-xl border border-success/40 bg-success/10 p-4 font-body text-sm text-success">
+            {savedMessage}
+          </p>
+        )}
 
-      <button disabled={isSubmitting} type="submit" className="btn-primary">{isSubmitting ? copy.auth.saving : copy.auth.saveChanges}</button>
-    </form>
+        <Button type="submit" size="lg" isLoading={isSubmitting} className="w-full">
+          {isSubmitting ? copy.auth.saving : copy.auth.saveChanges}
+        </Button>
+      </form>
+    </Card>
   );
-}
-
-function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
-  return <label className="block"><span className="field-label"><span>{label}</span>{hint && <span className="font-medium normal-case tracking-normal text-ink/40">{hint}</span>}</span>{children}{error && <span className="field-error">{error}</span>}</label>;
 }

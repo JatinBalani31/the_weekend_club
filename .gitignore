@@ -31,6 +31,9 @@ yarn-error.log*
 # local development data store (used when Supabase is not configured)
 /.data/
 
+# vendored agent skill content - regenerable from skills-lock.json, like node_modules
+/.agents/
+
 # vercel
 .vercel
 

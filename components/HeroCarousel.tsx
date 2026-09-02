@@ -3,6 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight } from "lucide-react";
+import { buttonStyles } from "@/components/ui/Button";
 import copy from "@/content/en.json";
 
 export type HeroSlide = {
@@ -64,25 +66,55 @@ export default function HeroCarousel({ slides }: HeroCarouselProps) {
   return (
     <section
       aria-label={copy.home.featuredUpdates}
-      className="relative isolate min-h-[min(720px,92svh)] overflow-hidden bg-ink text-paper"
+      // Taller frame on phones (roughly 4:5) so the headline has room; wider on desktop.
+      className="relative isolate aspect-[4/5] max-h-[92svh] min-h-[34rem] w-full overflow-hidden bg-bg text-text md:aspect-[16/9] md:min-h-[38rem]"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
       {slides.map((slide, index) => (
-        <div aria-hidden={index !== activeIndex} className={`absolute inset-0 transition-opacity duration-700 ${index === activeIndex ? "opacity-100" : "opacity-0"}`} key={slide.headline}>
+        <div
+          aria-hidden={index !== activeIndex}
+          className={`absolute inset-0 transition-opacity duration-700 ${index === activeIndex ? "opacity-100" : "opacity-0"}`}
+          key={slide.headline}
+        >
           <Image src={slide.image} alt="" fill priority={index === 0} sizes="100vw" className="object-cover" />
         </div>
       ))}
-      <div className="absolute inset-0 -z-0 bg-gradient-to-t from-ink via-ink/35 to-ink/10" />
-      <div className="relative z-10 mx-auto flex min-h-[min(720px,92svh)] max-w-7xl flex-col justify-between px-5 pb-8 pt-6 sm:px-10 sm:pb-12">
-        <div className="max-w-3xl">
-          <p className="mb-5 text-sm font-semibold uppercase tracking-[0.2em] text-accent">{copy.home.heroTagline}</p>
-          <h1 className="max-w-2xl font-display text-[clamp(3.5rem,14vw,8.5rem)] font-black uppercase leading-[0.85] tracking-[-0.06em]">{slides[activeIndex].headline}</h1>
-          <Link href={slides[activeIndex].ctaHref} className="mt-8 inline-flex min-h-12 items-center justify-center bg-accent px-6 text-sm font-bold uppercase tracking-[0.12em] text-ink transition-transform active:scale-95">{slides[activeIndex].ctaText}<span aria-hidden="true" className="ml-4 text-lg">↗</span></Link>
+      {/* Strong at the bottom so the headline stays readable over any photo, clear at the top. */}
+      <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-transparent" />
+      <div className="relative z-10 flex h-full flex-col justify-between px-5 pb-8 pt-8 sm:px-10 sm:pb-12">
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col justify-end">
+          <p className="mb-4 font-body text-xs font-semibold uppercase tracking-[0.22em] text-accent sm:text-sm">
+            {copy.home.heroTagline}
+          </p>
+          <h1 className="max-w-3xl font-display text-[clamp(3rem,13vw,8rem)] uppercase leading-[0.88] tracking-[-0.01em]">
+            {slides[activeIndex].headline}
+          </h1>
+          <div>
+            <Link href={slides[activeIndex].ctaHref} className={buttonStyles("primary", "lg", "mt-8")}>
+              {slides[activeIndex].ctaText}
+              <ArrowUpRight aria-hidden="true" size={18} />
+            </Link>
+          </div>
         </div>
-        <div className="flex items-center gap-3" aria-label={copy.home.chooseFeaturedUpdate}>
-          {slides.map((slide, index) => <button aria-label={`${copy.home.showSlide} ${index + 1}`} aria-current={index === activeIndex} className={`h-11 w-11 p-3 ${index === activeIndex ? "" : "opacity-60"}`} key={slide.headline} onClick={() => showSlide(index)} type="button"><span className={`block h-1 w-full ${index === activeIndex ? "bg-accent" : "bg-paper"}`} /></button>)}
-          <span className="ml-2 text-xs uppercase tracking-[0.16em] text-paper/70">{String(activeIndex + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}</span>
+        <div className="mx-auto mt-8 flex w-full max-w-7xl items-center gap-2" aria-label={copy.home.chooseFeaturedUpdate}>
+          {slides.map((slide, index) => (
+            <button
+              aria-label={`${copy.home.showSlide} ${index + 1}`}
+              aria-current={index === activeIndex}
+              className="flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              key={slide.headline}
+              onClick={() => showSlide(index)}
+              type="button"
+            >
+              <span
+                className={`block h-1.5 w-1.5 rounded-full transition-colors ${index === activeIndex ? "bg-accent" : "bg-text-muted/50"}`}
+              />
+            </button>
+          ))}
+          <span className="ml-2 font-body text-xs uppercase tracking-[0.16em] text-text-muted">
+            {String(activeIndex + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
+          </span>
         </div>
       </div>
     </section>

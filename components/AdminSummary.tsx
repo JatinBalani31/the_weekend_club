@@ -33,13 +33,13 @@ export default function AdminSummary({ registrations }: { registrations: AdminRe
         <SummaryCard label="Failed" value={totals.failed} />
       </div>
       {byEvent.length > 0 && (
-        <div className="mt-6 border border-ink/15">
-          <p className="border-b border-ink/15 bg-paper px-4 py-2 text-xs font-bold uppercase tracking-wider text-ink/60">By event</p>
-          <ul className="divide-y divide-ink/10">
+        <div className="mt-6 border border-border">
+          <p className="border-b border-border bg-bg px-4 py-2 text-xs font-bold uppercase tracking-wider text-text-muted">By event</p>
+          <ul className="divide-y divide-border">
             {byEvent.map((entry) => (
               <li key={entry.title} className="flex items-center justify-between px-4 py-2 text-sm">
                 <span className="font-bold">{entry.title}</span>
-                <span className="text-ink/55">{entry.paid} paid / {entry.total} total</span>
+                <span className="text-text-muted">{entry.paid} paid / {entry.total} total</span>
               </li>
             ))}
           </ul>
@@ -51,9 +51,9 @@ export default function AdminSummary({ registrations }: { registrations: AdminRe
 
 function SummaryCard({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
   return (
-    <div className="border border-ink/15 p-4">
-      <p className={`font-display text-3xl font-black ${accent ? "text-accent" : ""}`}>{value}</p>
-      <p className="mt-1 text-xs font-bold uppercase tracking-widest text-ink/50">{label}</p>
+    <div className="border border-border p-4">
+      <p className={`font-display text-3xl  ${accent ? "text-accent" : ""}`}>{value}</p>
+      <p className="mt-1 text-xs font-bold uppercase tracking-widest text-text-muted">{label}</p>
     </div>
   );
 }

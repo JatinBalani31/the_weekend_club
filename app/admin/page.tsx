@@ -14,7 +14,7 @@ export default async function AdminPage() {
   const [registrations, events] = await Promise.all([getAllRegistrations(), getAllEventsAdmin()]);
 
   return (
-    <main className="min-h-screen bg-paper px-5 py-8 sm:px-10 sm:py-12">
+    <main className="min-h-screen bg-bg px-5 py-8 sm:px-10 sm:py-12">
       <div className="mx-auto max-w-7xl">
         <AdminDashboard registrations={registrations} events={events} />
       </div>

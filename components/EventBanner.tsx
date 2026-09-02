@@ -19,8 +19,8 @@ export default function EventBanner({
 
   if (failed) {
     return (
-      <div className={`flex items-center justify-center bg-ink/40 ${className ?? ""}`}>
-        <ImageOff aria-hidden="true" size={28} className="text-paper/50" />
+      <div className={`flex items-center justify-center bg-surface ${className ?? ""}`}>
+        <ImageOff aria-hidden="true" size={28} className="text-text-muted" />
       </div>
     );
   }

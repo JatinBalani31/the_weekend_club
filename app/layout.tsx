@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { Viewport } from "next";
 import { cookies } from "next/headers";
-import localFont from "next/font/local";
+import { Bebas_Neue, Inter } from "next/font/google";
 import NavBar from "@/components/NavBar";
 import { getAdminCookieName, isValidAdminSession } from "@/lib/admin";
 import { getUserCookieName, getUserIdFromSessionToken } from "@/lib/userAuth";
@@ -9,15 +9,16 @@ import { getUserById } from "@/lib/users";
 import copy from "@/content/en.json";
 import "./globals.css";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
+const displayFont = Bebas_Neue({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-display",
+  display: "swap",
 });
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
+const bodyFont = Inter({
+  subsets: ["latin"],
+  variable: "--font-body",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -42,7 +43,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${displayFont.variable} ${bodyFont.variable} bg-bg font-body text-text antialiased`}
       >
         <div className="min-h-screen pb-[env(safe-area-inset-bottom)]">
           <NavBar isLoggedIn={Boolean(user)} userName={user?.name} isAdmin={isAdmin} />
