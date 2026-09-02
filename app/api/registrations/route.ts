@@ -1,72 +1,65 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getUpcomingEventBySlug } from "@/lib/events";
-import { getSupabaseAdminClient } from "@/lib/supabase";
 import { getUserCookieName, getUserIdFromSessionToken } from "@/lib/userAuth";
-import { devCreateRegistration, isDevStoreEnabled } from "@/lib/devStore";
+import { parseRegistrationInput, toOrderNotes } from "@/lib/registrationInput";
+import { persistRegistration, resolveEventForRegistration } from "@/lib/createRegistration";
 
-type RegistrationPayload = {
-  eventSlug?: unknown;
-  name?: unknown;
-  email?: unknown;
-  phone?: unknown;
-  strava_handle?: unknown;
-  ticket_tier_id?: unknown;
-  email_updates?: unknown;
-};
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const phonePattern = /^(?:\+91[\s-]?)?[6-9]\d{9}$/;
-
+/**
+ * Starts a registration.
+ *
+ * Free events are saved straight away. Paid events are NOT written to the
+ * database here - the submission is carried in the Razorpay order's notes and
+ * only becomes a row once /api/verify-payment confirms the payment, so an
+ * abandoned checkout leaves nothing behind.
+ */
 export async function POST(request: Request) {
-  let payload: RegistrationPayload;
+  let payload: unknown;
   try {
     payload = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const eventSlug = typeof payload.eventSlug === "string" ? payload.eventSlug : "";
-  const name = typeof payload.name === "string" ? payload.name.trim() : "";
-  const email = typeof payload.email === "string" ? payload.email.trim().toLowerCase() : "";
-  const phone = typeof payload.phone === "string" ? payload.phone.replace(/[\s-]/g, "") : "";
-  const stravaHandle = typeof payload.strava_handle === "string" ? payload.strava_handle.trim() || null : null;
-  const ticketTierId = typeof payload.ticket_tier_id === "string" ? payload.ticket_tier_id : null;
-  const emailUpdates = payload.email_updates === true;
+  const { input, error: parseError } = parseRegistrationInput(payload);
+  if (parseError || !input) return NextResponse.json({ error: parseError }, { status: 400 });
 
-  if (!eventSlug || !name || !emailPattern.test(email) || !phonePattern.test(phone)) {
-    return NextResponse.json({ error: "Please check the details you entered." }, { status: 400 });
-  }
-
-  const event = await getUpcomingEventBySlug(eventSlug);
-  if (!event) return NextResponse.json({ error: "This event is no longer available." }, { status: 404 });
-
-  const tier = ticketTierId ? event.ticket_tiers?.find((item) => item.id === ticketTierId && item.is_active && (!item.sale_ends_at || new Date(item.sale_ends_at) > new Date())) : null;
-  if (event.ticket_tiers?.length && !tier) return NextResponse.json({ error: "Choose an available ticket tier." }, { status: 400 });
+  const { resolved, error: resolveError, status } = await resolveEventForRegistration(input);
+  if (resolveError || !resolved) return NextResponse.json({ error: resolveError }, { status: status ?? 400 });
 
   const userId = getUserIdFromSessionToken(cookies().get(getUserCookieName())?.value);
 
-  if (isDevStoreEnabled()) {
-    const registration = devCreateRegistration({
-      event_id: event.id, ticket_tier_id: tier?.id ?? null, charged_price: tier?.price ?? event.price,
-      name, email, phone, strava_handle: stravaHandle, email_updates: emailUpdates, payment_status: "pending", user_id: userId,
-    });
-    return NextResponse.json({ registrationId: registration.id }, { status: 201 });
+  // Free event: nothing to pay, so the spot is secured immediately.
+  if (resolved.amount <= 0) {
+    const { registrationId, error } = await persistRegistration({ input, resolved, userId, paymentStatus: "paid" });
+    if (error || !registrationId) return NextResponse.json({ error: error ?? "Could not save your registration." }, { status: 500 });
+    return NextResponse.json({ free: true, registrationId }, { status: 201 });
   }
 
-  const supabase = getSupabaseAdminClient();
-  if (!supabase) return NextResponse.json({ error: "Registration is not configured yet." }, { status: 503 });
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keyId || !keySecret) return NextResponse.json({ error: "Payment is not configured yet." }, { status: 503 });
 
-  const { data, error } = await supabase
-    .from("registrations")
-    .insert({ event_id: event.id, ticket_tier_id: tier?.id ?? null, charged_price: tier?.price ?? event.price, name, email, phone, strava_handle: stravaHandle, email_updates: emailUpdates, payment_status: "pending", user_id: userId })
-    .select("id")
-    .single();
+  const orderResponse = await fetch("https://api.razorpay.com/v1/orders", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      amount: Math.round(resolved.amount * 100), // Razorpay works in paise.
+      currency: "INR",
+      receipt: `evt_${resolved.event.id.slice(0, 30)}`,
+      notes: toOrderNotes(input, userId),
+    }),
+  });
 
-  if (error) {
-    console.error("Unable to create registration", error);
-    return NextResponse.json({ error: "Could not save your registration." }, { status: 500 });
+  if (!orderResponse.ok) {
+    console.error("Unable to create Razorpay order", orderResponse.status, await orderResponse.text());
+    return NextResponse.json({ error: "Could not start payment." }, { status: 502 });
   }
 
-  return NextResponse.json({ registrationId: data.id }, { status: 201 });
+  const order = (await orderResponse.json()) as { id?: string; amount?: number; currency?: string };
+  if (!order.id) return NextResponse.json({ error: "Payment provider returned an invalid order." }, { status: 502 });
+
+  return NextResponse.json({ free: false, orderId: order.id, keyId, amount: order.amount, currency: order.currency }, { status: 200 });
 }
