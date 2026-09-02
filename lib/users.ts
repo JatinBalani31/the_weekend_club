@@ -1,5 +1,7 @@
 import { getSupabaseAdminClient } from "@/lib/supabase";
 import { hashPassword } from "@/lib/userAuth";
+import { registrationCodeFromId } from "@/lib/registrationCode";
+import { hasRegistrationCodeColumn } from "@/lib/registrations";
 import {
   devCreateUser,
   devFindTierName,
@@ -22,6 +24,7 @@ export type UserWithPasswordHash = PublicUser & { password_hash: string };
 
 export type UserRegistration = {
   id: string;
+  registration_code: string;
   payment_status: "pending" | "paid" | "failed";
   charged_price: number | null;
   created_at: string;
@@ -129,6 +132,7 @@ export async function getUserRegistrations(userId: string): Promise<UserRegistra
       const tierName = devFindTierName(registration.event_id, registration.ticket_tier_id);
       return {
         id: registration.id,
+        registration_code: registration.registration_code ?? registrationCodeFromId(registration.id),
         payment_status: registration.payment_status,
         charged_price: registration.charged_price,
         created_at: registration.created_at,
@@ -140,10 +144,11 @@ export async function getUserRegistrations(userId: string): Promise<UserRegistra
 
   const supabase = getSupabaseAdminClient();
   if (!supabase) return [];
+  const hasColumn = await hasRegistrationCodeColumn(supabase);
 
   const { data, error } = await supabase
     .from("registrations")
-    .select("id, payment_status, charged_price, created_at, event:events(title, slug, date, location), ticket_tier:ticket_tiers(name)")
+    .select(`${hasColumn ? "registration_code, " : ""}id, payment_status, charged_price, created_at, event:events(title, slug, date, location), ticket_tier:ticket_tiers(name)`)
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -152,9 +157,17 @@ export async function getUserRegistrations(userId: string): Promise<UserRegistra
     return [];
   }
 
-  return (data ?? []).map((registration) => ({
-    ...registration,
-    event: Array.isArray(registration.event) ? registration.event[0] ?? null : registration.event,
-    ticket_tier: Array.isArray(registration.ticket_tier) ? registration.ticket_tier[0] ?? null : registration.ticket_tier,
+  // The select list is built at runtime, so Supabase cannot infer the row shape.
+  type RawRow = Omit<UserRegistration, "registration_code" | "event" | "ticket_tier"> & {
+    registration_code?: string | null;
+    event?: unknown;
+    ticket_tier?: unknown;
+  };
+
+  return ((data ?? []) as unknown as RawRow[]).map((row) => ({
+    ...row,
+    registration_code: row.registration_code ?? registrationCodeFromId(row.id),
+    event: Array.isArray(row.event) ? row.event[0] ?? null : row.event,
+    ticket_tier: Array.isArray(row.ticket_tier) ? row.ticket_tier[0] ?? null : row.ticket_tier,
   })) as UserRegistration[];
 }

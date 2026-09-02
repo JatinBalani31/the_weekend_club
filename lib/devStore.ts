@@ -27,6 +27,7 @@ export type DevRegistration = {
   razorpay_order_id: string | null;
   payment_id: string | null;
   user_id: string | null;
+  registration_code: string;
   created_at: string;
 };
 
@@ -178,6 +179,16 @@ export function devSetRegistrationPaid(id: string, paymentId: string | null) {
   const registration = db.registrations.find((item) => item.id === id);
   if (!registration) return;
   registration.payment_status = "paid";
+  registration.payment_id = paymentId;
+  writeDb(db);
+}
+
+/** Attaches the Razorpay order/payment ids to a registration after verification. */
+export function devSetRegistrationPaymentRefs(id: string, orderId: string | null, paymentId: string | null) {
+  const db = readDb();
+  const registration = db.registrations.find((item) => item.id === id);
+  if (!registration) return;
+  registration.razorpay_order_id = orderId;
   registration.payment_id = paymentId;
   writeDb(db);
 }

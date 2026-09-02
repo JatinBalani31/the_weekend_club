@@ -19,9 +19,18 @@
   },
   "home": {
     "slides": [
-      { "headline": "Find your pace.", "cta": "See upcoming runs" },
-      { "headline": "Make weekends count.", "cta": "Meet the club" },
-      { "headline": "Move as one.", "cta": "Join the community" }
+      {
+        "headline": "Find your pace.",
+        "cta": "See upcoming runs"
+      },
+      {
+        "headline": "Make weekends count.",
+        "cta": "Meet the club"
+      },
+      {
+        "headline": "Move as one.",
+        "cta": "Join the community"
+      }
     ],
     "heroTagline": "Run outside. Feel alive.",
     "featuredUpdates": "Featured club updates",
@@ -40,9 +49,18 @@
     "viewAll": "View all",
     "noRuns": "New runs are landing soon. Check back this week.",
     "community": {
-      "whatsapp": { "label": "WhatsApp", "description": "Plan weekend miles with the crew." },
-      "strava": { "label": "Strava", "description": "See the routes. Share the effort." },
-      "instagram": { "label": "Instagram", "description": "Catch the club between runs." }
+      "whatsapp": {
+        "label": "WhatsApp",
+        "description": "Plan weekend miles with the crew."
+      },
+      "strava": {
+        "label": "Strava",
+        "description": "See the routes. Share the effort."
+      },
+      "instagram": {
+        "label": "Instagram",
+        "description": "Catch the club between runs."
+      }
     }
   },
   "common": {
@@ -134,7 +152,10 @@
     "registrationCount": "registration",
     "registrationsCount": "registrations",
     "empty": "You haven't registered for anything yet.",
-    "browseEvents": "Browse events"
+    "browseEvents": "Browse events",
+    "registrationNumber": "Registration no",
+    "showPass": "Show QR",
+    "hidePass": "Hide QR"
   },
   "success": {
     "metadataTitle": "Registration received | the Weekend Club",
@@ -154,7 +175,24 @@
     "couldNotUpdate": "Could not update the event.",
     "couldNotDelete": "Could not delete the event.",
     "deleteConfirm": "Delete \"{title}\"? This cannot be undone.",
-    "table": { "title": "Title", "date": "Date", "type": "Type", "price": "Price", "capacity": "Capacity", "registered": "Registered", "status": "Status", "name": "Name", "email": "Email", "phone": "Phone", "event": "Event", "tier": "Tier", "amount": "Amount", "updates": "Updates", "registeredAt": "Registered" },
+    "table": {
+      "title": "Title",
+      "date": "Date",
+      "type": "Type",
+      "price": "Price",
+      "capacity": "Capacity",
+      "registered": "Registered",
+      "status": "Status",
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "event": "Event",
+      "tier": "Tier",
+      "amount": "Amount",
+      "updates": "Updates",
+      "registeredAt": "Registered",
+      "registrationNo": "Reg. no"
+    },
     "active": "Active",
     "inactive": "Inactive",
     "edit": "Edit",
@@ -180,7 +218,9 @@
     "unableToSignIn": "Unable to sign in.",
     "adminPassword": "Admin password",
     "signIn": "Sign in",
-    "access": "Admin access"
+    "access": "Admin access",
+    "checking": "Checking...",
+    "enterDashboard": "Enter dashboard"
   },
   "eventForm": {
     "edit": "Edit event",
