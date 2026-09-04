@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import copy from "@/content/en.json";
 
 type FormValues = { identifier: string; password: string };
@@ -22,21 +25,31 @@ export default function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="card space-y-6">
-      <Field label={copy.auth.emailOrMobile} error={errors.identifier?.message}>
-        <input {...register("identifier", { required: copy.auth.enterEmailOrPhone })} autoComplete="username" className="field" placeholder={copy.auth.emailOrPhonePlaceholder} />
-      </Field>
-      <Field label={copy.auth.password} error={errors.password?.message}>
-        <input {...register("password", { required: copy.auth.enterPassword })} autoComplete="current-password" className="field" type="password" />
-      </Field>
-      {submitError && <p role="alert" className="form-alert">{submitError}</p>}
-      <button disabled={isSubmitting} type="submit" className="btn-primary">
-        {isSubmitting ? copy.auth.signingIn : copy.navigation.login}
-      </button>
-    </form>
+    <Card>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+        <Input
+          label={copy.auth.emailOrMobile}
+          error={errors.identifier?.message}
+          autoComplete="username"
+          placeholder={copy.auth.emailOrPhonePlaceholder}
+          {...register("identifier", { required: copy.auth.enterEmailOrPhone })}
+        />
+        <Input
+          label={copy.auth.password}
+          error={errors.password?.message}
+          autoComplete="current-password"
+          type="password"
+          {...register("password", { required: copy.auth.enterPassword })}
+        />
+        {submitError && (
+          <p role="alert" className="rounded-xl border border-error/40 bg-error/10 p-4 font-body text-sm text-error">
+            {submitError}
+          </p>
+        )}
+        <Button type="submit" size="lg" isLoading={isSubmitting} className="w-full">
+          {isSubmitting ? copy.auth.signingIn : copy.navigation.login}
+        </Button>
+      </form>
+    </Card>
   );
-}
-
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return <label className="block"><span className="field-label"><span>{label}</span></span>{children}{error && <span className="field-error">{error}</span>}</label>;
 }

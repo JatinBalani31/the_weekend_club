@@ -28,5 +28,5 @@ export default function AddToCalendarButton({ title, date, location }: AddToCale
     URL.revokeObjectURL(url);
   }
 
-  return <button type="button" onClick={downloadCalendarFile} className="flex min-h-12 items-center gap-3 border border-paper/25 px-5 text-sm font-bold uppercase tracking-wider"><CalendarPlus size={18} /> {copy.success.addToCalendar}</button>;
+  return <button type="button" onClick={downloadCalendarFile} className="flex min-h-12 items-center gap-3 border border-border px-5 text-sm font-bold uppercase tracking-wider"><CalendarPlus size={18} /> {copy.success.addToCalendar}</button>;
 }

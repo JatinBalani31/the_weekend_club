@@ -6,13 +6,13 @@ import { parseEventInput } from "@/lib/eventValidation";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!isAdminRequestAuthorized()) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await isAdminRequestAuthorized())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   const events = await getAllEventsAdmin();
   return NextResponse.json({ events });
 }
 
 export async function POST(request: Request) {
-  if (!isAdminRequestAuthorized()) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await isAdminRequestAuthorized())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
   let payload: unknown;
   try { payload = await request.json(); } catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }

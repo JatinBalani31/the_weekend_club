@@ -15,6 +15,7 @@ export default function AdminTable({ registrations }: { registrations: AdminRegi
 
   function exportExcel() {
     const rows = filtered.map((item) => ({
+      "Registration no": item.registration_code,
       Name: item.name,
       Email: item.email,
       Phone: item.phone,
@@ -41,30 +42,31 @@ export default function AdminTable({ registrations }: { registrations: AdminRegi
   return (
     <section className="mt-8">
       <AdminSummary registrations={filtered} />
-      <div className="mt-8 flex flex-col gap-3 border-y border-ink/15 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <label className="text-xs font-bold uppercase tracking-wider text-ink/60">Filter by event<select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)} className="ml-3 min-h-11 border border-ink/20 bg-white px-3 text-sm font-normal normal-case tracking-normal"><option value="all">All events</option>{events.map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select></label>
-        <button type="button" onClick={exportExcel} className="min-h-11 border border-ink/25 px-4 text-xs font-bold uppercase tracking-wider">{copy.admin.export}</button>
+      <div className="mt-8 flex flex-col gap-3 border-y border-border py-4 sm:flex-row sm:items-center sm:justify-between">
+        <label className="text-xs font-bold uppercase tracking-wider text-text-muted">Filter by event<select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)} className="ml-3 min-h-11 border border-border bg-surface px-3 text-sm font-normal normal-case tracking-normal"><option value="all">All events</option>{events.map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select></label>
+        <button type="button" onClick={exportExcel} className="min-h-11 border border-border px-4 text-xs font-bold uppercase tracking-wider">{copy.admin.export}</button>
       </div>
       <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-          <thead><tr className="border-b border-ink/20 text-xs uppercase tracking-wider text-ink/50">{["Name", "Email", "Phone", "Event", "Tier", "Amount", "Status", "Updates", "Registered"].map((heading) => <th key={heading} className="px-3 py-3 font-bold">{heading}</th>)}</tr></thead>
+        <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
+          <thead><tr className="border-b border-border text-xs uppercase tracking-wider text-text-muted">{[copy.admin.table.registrationNo, "Name", "Email", "Phone", "Event", "Tier", "Amount", "Status", "Updates", "Registered"].map((heading) => <th key={heading} className="px-3 py-3 font-bold">{heading}</th>)}</tr></thead>
           <tbody>
             {filtered.map((item) => (
-              <tr key={item.id} className="border-b border-ink/10">
+              <tr key={item.id} className="border-b border-border">
+                <td className="px-3 py-4 font-mono text-xs uppercase tracking-wider text-accent">{item.registration_code}</td>
                 <td className="px-3 py-4 font-bold">{item.name}</td>
                 <td className="px-3 py-4">{item.email}</td>
                 <td className="px-3 py-4">{item.phone}</td>
                 <td className="px-3 py-4">{item.event?.title ?? "Unknown event"}</td>
                 <td className="px-3 py-4">{item.ticket_tier?.name ?? "—"}</td>
                 <td className="px-3 py-4">{item.charged_price != null ? `INR ${item.charged_price}` : "—"}</td>
-                <td className="px-3 py-4 uppercase tracking-wider"><span className={item.payment_status === "paid" ? "text-green-700" : "text-ink/60"}>{item.payment_status}</span></td>
+                <td className="px-3 py-4 uppercase tracking-wider"><span className={item.payment_status === "paid" ? "text-success" : "text-text-muted"}>{item.payment_status}</span></td>
                 <td className="px-3 py-4">{item.email_updates ? "Yes" : "No"}</td>
                 <td className="px-3 py-4">{dateFormatter.format(new Date(item.created_at))}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        {filtered.length === 0 && <p className="border-b border-ink/10 py-8 text-sm text-ink/55">{copy.admin.noRegistrations}</p>}
+        {filtered.length === 0 && <p className="border-b border-border py-8 text-sm text-text-muted">{copy.admin.noRegistrations}</p>}
       </div>
     </section>
   );

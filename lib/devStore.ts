@@ -27,6 +27,7 @@ export type DevRegistration = {
   razorpay_order_id: string | null;
   payment_id: string | null;
   user_id: string | null;
+  registration_code: string;
   created_at: string;
 };
 
@@ -36,6 +37,7 @@ export type DevUser = {
   email: string;
   phone: string;
   password_hash: string;
+  sessions_valid_from?: string;
   created_at: string;
 };
 
@@ -182,6 +184,16 @@ export function devSetRegistrationPaid(id: string, paymentId: string | null) {
   writeDb(db);
 }
 
+/** Attaches the Razorpay order/payment ids to a registration after verification. */
+export function devSetRegistrationPaymentRefs(id: string, orderId: string | null, paymentId: string | null) {
+  const db = readDb();
+  const registration = db.registrations.find((item) => item.id === id);
+  if (!registration) return;
+  registration.razorpay_order_id = orderId;
+  registration.payment_id = paymentId;
+  writeDb(db);
+}
+
 export function devFindTierName(eventId: string, tierId: string | null) {
   if (!tierId) return null;
   const event = devGetEventById(eventId);
@@ -210,16 +222,20 @@ export function devCreateUser(input: { name: string; email: string; phone: strin
   return { user };
 }
 
-export function devUpdateUser(id: string, patch: { name: string; email: string; phone: string; password_hash?: string }) {
+export function devUpdateUser(
+  id: string,
+  patch: { name?: string; email?: string; phone?: string; password_hash?: string; sessions_valid_from?: string },
+) {
   const db = readDb();
   const user = db.users.find((item) => item.id === id);
   if (!user) return { error: "Account not found." };
-  if (db.users.some((item) => item.id !== id && item.email === patch.email)) return { error: "An account with this email already exists." };
-  if (db.users.some((item) => item.id !== id && item.phone === patch.phone)) return { error: "An account with this phone number already exists." };
-  user.name = patch.name;
-  user.email = patch.email;
-  user.phone = patch.phone;
+  if (patch.email && db.users.some((item) => item.id !== id && item.email === patch.email)) return { error: "An account with this email already exists." };
+  if (patch.phone && db.users.some((item) => item.id !== id && item.phone === patch.phone)) return { error: "An account with this phone number already exists." };
+  if (patch.name) user.name = patch.name;
+  if (patch.email) user.email = patch.email;
+  if (patch.phone) user.phone = patch.phone;
   if (patch.password_hash) user.password_hash = patch.password_hash;
+  if (patch.sessions_valid_from) user.sessions_valid_from = patch.sessions_valid_from;
   writeDb(db);
   return { user };
 }

@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Input, { fieldStyles, fieldLabelStyles, fieldErrorStyles } from "@/components/ui/Input";
 import copy from "@/content/en.json";
 
 type FormValues = {
@@ -14,6 +17,13 @@ type FormValues = {
 };
 
 type PrefillUser = { name: string; email: string; phone: string };
+
+/**
+ * Razorpay's checkout is a third-party widget, so it needs a literal hex rather
+ * than a Tailwind token. This is the palette's `bg` - Razorpay renders white text
+ * on this colour, so the light `accent` lime would be unreadable there.
+ */
+const CHECKOUT_THEME_COLOR = "#0A0A0B";
 
 export default function RegistrationForm({ eventSlug, tiers = [], user }: { eventSlug: string; tiers?: { id: string; name: string; price: number }[]; user?: PrefillUser }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -28,23 +38,18 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
     setSubmitError(null);
     setIsProcessing(true);
     try {
+      // Free events are saved by this call. Paid events only get a Razorpay
+      // order back - nothing is stored until the payment is verified.
       const response = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...values, eventSlug }),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? copy.common.somethingWentWrong);
+      const order = await response.json();
+      if (!response.ok) throw new Error(order.error ?? copy.common.somethingWentWrong);
 
-      const orderResponse = await fetch("/api/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registrationId: result.registrationId }),
-      });
-      const order = await orderResponse.json();
-      if (!orderResponse.ok) throw new Error(order.error ?? copy.registration.paymentStartError);
       if (order.free) {
-        window.location.assign(`/success?registration_id=${encodeURIComponent(result.registrationId)}`);
+        window.location.assign(`/success?registration_id=${encodeURIComponent(order.registrationId)}`);
         return;
       }
 
@@ -56,7 +61,7 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
         name: copy.brand.name,
         description: copy.registration.eventRegistration,
         prefill: { name: values.name, email: values.email, contact: values.phone },
-        theme: { color: "#ff5a36" },
+        theme: { color: CHECKOUT_THEME_COLOR },
         config: {
           display: {
             blocks: {
@@ -68,18 +73,19 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
           },
         },
         handler: async (payment: RazorpayPaymentResponse) => {
+          // The registration row is created here, once the payment is verified.
           const verification = await fetch("/api/verify-payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ registrationId: result.registrationId, ...payment }),
+            body: JSON.stringify(payment),
           });
           const verificationResult = await verification.json();
-          if (!verification.ok) {
+          if (!verification.ok || !verificationResult.registrationId) {
             setSubmitError(verificationResult.error ?? copy.registration.paymentVerifyError);
             setIsProcessing(false);
             return;
           }
-          window.location.assign(`/success?registration_id=${encodeURIComponent(result.registrationId)}`);
+          window.location.assign(`/success?registration_id=${encodeURIComponent(verificationResult.registrationId)}`);
         },
         modal: { ondismiss: () => { setSubmitError(copy.registration.paymentCancelled); setIsProcessing(false); } },
       });
@@ -90,32 +96,82 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
     }
   }
 
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} noValidate className="card space-y-6">
-      <Field label={copy.auth.name} error={errors.name?.message}>
-        <input {...register("name", { required: "Tell us your name." })} autoComplete="name" className="field" placeholder="Your full name" />
-      </Field>
-      <Field label={copy.auth.email} error={errors.email?.message}>
-        <input {...register("email", { required: "Enter your email.", pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email." } })} autoComplete="email" className="field" placeholder="you@example.com" type="email" />
-      </Field>
-      <Field label={copy.auth.whatsappMobile} hint={copy.auth.indianNumber} error={errors.phone?.message}>
-        <input {...register("phone", { required: "Enter your phone number.", pattern: { value: /^(?:\+91[\s-]?)?[6-9]\d{9}$/, message: "Enter a valid Indian phone number." } })} autoComplete="tel" className="field" inputMode="tel" placeholder="98765 43210" type="tel" />
-      </Field>
-      <Field label={copy.registration.stravaHandle} hint={copy.common.optional} error={errors.strava_handle?.message}>
-        <input {...register("strava_handle")} autoComplete="off" className="field" placeholder="@yourhandle" />
-      </Field>
-      <label className="flex min-h-11 items-start gap-3 text-sm leading-relaxed text-ink/65"><input {...register("email_updates")} type="checkbox" className="mt-1 h-4 w-4 accent-accent" /> <span>{copy.registration.sendUpdates} <span className="text-ink/40">{copy.common.optional}</span></span></label>
-      {tiers.length > 0 && <Field label={copy.common.ticketTiers} error={errors.ticket_tier_id?.message}><select {...register("ticket_tier_id", { required: copy.registration.chooseTierRequired })} className="field"><option value="">{copy.registration.chooseTier}</option>{tiers.map((tier) => <option key={tier.id} value={tier.id}>{tier.name} - INR {tier.price}</option>)}</select></Field>}
-      {submitError && <p role="alert" className="form-alert">{submitError}</p>}
-      <button disabled={isSubmitting || isProcessing} type="submit" className="btn-primary">
-        {isSubmitting || isProcessing ? copy.registration.confirming : copy.registration.complete}
-      </button>
-    </form>
-  );
-}
+  const isBusy = isSubmitting || isProcessing;
 
-function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
-  return <label className="block"><span className="field-label"><span>{label}</span>{hint && <span className="font-medium normal-case tracking-normal text-ink/40">{hint}</span>}</span>{children}{error && <span className="field-error">{error}</span>}</label>;
+  return (
+    <Card>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
+        <Input
+          label={copy.auth.name}
+          error={errors.name?.message}
+          autoComplete="name"
+          placeholder="Your full name"
+          {...register("name", { required: "Tell us your name." })}
+        />
+        <Input
+          label={copy.auth.email}
+          error={errors.email?.message}
+          autoComplete="email"
+          placeholder="you@example.com"
+          type="email"
+          {...register("email", { required: "Enter your email.", pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email." } })}
+        />
+        <Input
+          label={copy.auth.whatsappMobile}
+          hint={copy.auth.indianNumber}
+          error={errors.phone?.message}
+          autoComplete="tel"
+          inputMode="tel"
+          placeholder="98765 43210"
+          type="tel"
+          {...register("phone", { required: "Enter your phone number.", pattern: { value: /^(?:\+91[\s-]?)?[6-9]\d{9}$/, message: "Enter a valid Indian phone number." } })}
+        />
+        <Input
+          label={copy.registration.stravaHandle}
+          hint={copy.common.optional}
+          error={errors.strava_handle?.message}
+          autoComplete="off"
+          placeholder="@yourhandle"
+          {...register("strava_handle")}
+        />
+
+        <label className="flex min-h-11 items-start gap-3 font-body text-sm leading-relaxed text-text-muted">
+          <input {...register("email_updates")} type="checkbox" className="mt-1 h-4 w-4 accent-accent" />
+          <span>
+            {copy.registration.sendUpdates} <span className="text-text-muted/60">{copy.common.optional}</span>
+          </span>
+        </label>
+
+        {tiers.length > 0 && (
+          <div>
+            <span className={fieldLabelStyles}>{copy.common.ticketTiers}</span>
+            <select
+              {...register("ticket_tier_id", { required: copy.registration.chooseTierRequired })}
+              className={`${fieldStyles} cursor-pointer appearance-none pr-10`}
+            >
+              <option value="">{copy.registration.chooseTier}</option>
+              {tiers.map((tier) => (
+                <option key={tier.id} value={tier.id}>
+                  {tier.name} - INR {tier.price}
+                </option>
+              ))}
+            </select>
+            {errors.ticket_tier_id?.message && <span className={fieldErrorStyles}>{errors.ticket_tier_id.message}</span>}
+          </div>
+        )}
+
+        {submitError && (
+          <p role="alert" className="rounded-xl border border-error/40 bg-error/10 p-4 font-body text-sm text-error">
+            {submitError}
+          </p>
+        )}
+
+        <Button type="submit" size="lg" isLoading={isBusy} className="w-full">
+          {isBusy ? copy.registration.confirming : copy.registration.complete}
+        </Button>
+      </form>
+    </Card>
+  );
 }
 
 declare global {
