@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/users";
 import { parseRegistrationInput, toOrderNotes } from "@/lib/registrationInput";
 import { persistRegistration, resolveEventForRegistration } from "@/lib/createRegistration";
 import { RATE_LIMITS, checkRateLimit, clientKey, tooManyRequests } from "@/lib/rateLimit";
+import copy from "@/content/en.json";
 
 /**
  * Starts a registration.
@@ -45,6 +46,15 @@ export async function POST(request: Request) {
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) return NextResponse.json({ error: "Payment is not configured yet." }, { status: 503 });
 
+  // Razorpay rejects orders under 100 paise. Catching it here turns an opaque
+  // gateway failure at checkout into a clear message, and points at the real
+  // cause: an event priced between 0 and 1 rupee.
+  const amountInPaise = Math.round(resolved.amount * 100);
+  if (amountInPaise < 100) {
+    console.error("Event priced below the Razorpay minimum", resolved.event.slug, resolved.amount);
+    return NextResponse.json({ error: copy.registration.amountTooSmall }, { status: 400 });
+  }
+
   const orderResponse = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
     headers: {
@@ -52,7 +62,7 @@ export async function POST(request: Request) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      amount: Math.round(resolved.amount * 100), // Razorpay works in paise.
+      amount: amountInPaise,
       currency: "INR",
       receipt: `evt_${resolved.event.id.slice(0, 30)}`,
       notes: toOrderNotes(input, userId),

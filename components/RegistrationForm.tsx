@@ -89,6 +89,16 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
         },
         modal: { ondismiss: () => { setSubmitError(copy.registration.paymentCancelled); setIsProcessing(false); } },
       });
+
+      // A declined card or a failed UPI collect fires this instead of `handler`.
+      // Without it the modal closes and the form silently looks idle, so the
+      // person has no idea whether they were charged.
+      checkout.on("payment.failed", (failure: RazorpayFailureResponse) => {
+        const reason = failure?.error?.description;
+        setSubmitError(reason ? `${copy.registration.paymentFailed} ${reason}` : copy.registration.paymentFailed);
+        setIsProcessing(false);
+      });
+
       checkout.open();
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : copy.common.somethingWentWrong);
@@ -176,7 +186,10 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
 
 declare global {
   interface Window {
-    Razorpay: new (options: RazorpayOptions) => { open: () => void };
+    Razorpay: new (options: RazorpayOptions) => {
+      open: () => void;
+      on: (event: "payment.failed", handler: (failure: RazorpayFailureResponse) => void) => void;
+    };
   }
 }
 
@@ -184,6 +197,15 @@ type RazorpayPaymentResponse = {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
+};
+
+type RazorpayFailureResponse = {
+  error?: {
+    code?: string;
+    description?: string;
+    reason?: string;
+    metadata?: { order_id?: string; payment_id?: string };
+  };
 };
 
 type RazorpayOptions = {
