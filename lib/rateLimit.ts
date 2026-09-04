@@ -12,12 +12,21 @@ export type RateLimitResult = { allowed: boolean; retryAfter: number };
  */
 const devCounters = new Map<string, { count: number; windowStart: number }>();
 
+/**
+ * Limits are per IP, and a whole venue often shares one: Indian mobile carriers
+ * use CGNAT heavily, and everyone on the WiFi at a run looks like a single
+ * address. Public limits are therefore sized for "a group signing up together"
+ * rather than one person, or the sixth person at an event would be locked out.
+ *
+ * Admin login is the exception and stays deliberately tight - it is one shared
+ * password guarding every registration, and only one person ever uses it.
+ */
 export const RATE_LIMITS = {
   adminLogin: { max: 5, windowSeconds: 15 * 60 },
-  login: { max: 10, windowSeconds: 15 * 60 },
-  signup: { max: 5, windowSeconds: 60 * 60 },
-  registration: { max: 15, windowSeconds: 60 * 60 },
-  profile: { max: 20, windowSeconds: 60 * 60 },
+  login: { max: 20, windowSeconds: 15 * 60 },
+  signup: { max: 30, windowSeconds: 60 * 60 },
+  registration: { max: 60, windowSeconds: 60 * 60 },
+  profile: { max: 30, windowSeconds: 60 * 60 },
 } as const;
 
 /**

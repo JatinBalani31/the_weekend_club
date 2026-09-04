@@ -81,6 +81,21 @@ export async function createEvent(overrides: Record<string, unknown> = {}) {
   return data;
 }
 
+/**
+ * Clears the rate-limit counters for this machine.
+ *
+ * The suite makes far more login/signup attempts from one address than a real
+ * person would, so without this it throttles itself and reports failures that
+ * are really the limiter working correctly. Specs that assert throttling call
+ * this first so they start from a known count.
+ */
+export async function resetRateLimits() {
+  const supabase = admin();
+  const { error } = await supabase.from("rate_limits").delete().neq("key", "");
+  // Absent table just means the migration has not been applied; not fatal here.
+  if (error && error.code !== "42P01") throw new Error(`could not reset rate limits: ${error.message}`);
+}
+
 /** Removes everything this suite created, matched on the marker. */
 export async function cleanupTestData() {
   const supabase = admin();

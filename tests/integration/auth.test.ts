@@ -1,6 +1,7 @@
-import { afterAll, describe, expect, it } from "vitest";
-import { api, cleanupTestData, cookieFrom, testEmail, testPhone, BASE_URL } from "./helpers";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { api, cleanupTestData, cookieFrom, testEmail, testPhone, BASE_URL, resetRateLimits } from "./helpers";
 
+beforeAll(resetRateLimits);
 afterAll(cleanupTestData);
 
 describe("signup", () => {

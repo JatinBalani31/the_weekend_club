@@ -1,6 +1,7 @@
-import { afterAll, describe, expect, it } from "vitest";
-import { admin, adminSessionCookie, api, cleanupTestData, createEvent, TEST_MARKER, BASE_URL } from "./helpers";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { admin, adminSessionCookie, api, cleanupTestData, createEvent, TEST_MARKER, BASE_URL, resetRateLimits } from "./helpers";
 
+beforeAll(resetRateLimits);
 afterAll(cleanupTestData);
 
 describe("admin authentication", () => {
