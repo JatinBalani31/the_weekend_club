@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import ProfileForm from "@/components/ProfileForm";
-import { getUserCookieName, getUserIdFromSessionToken } from "@/lib/userAuth";
-import { getUserById } from "@/lib/users";
+import { getUserCookieName } from "@/lib/userAuth";
+import { getSessionUser } from "@/lib/users";
 import copy from "@/content/en.json";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: `${copy.auth.settingsTitle} | ${copy.brand.name}` };
 
 export default async function SettingsPage() {
- const userId = getUserIdFromSessionToken(cookies().get(getUserCookieName())?.value);
- if (!userId) redirect("/login");
-
- const user = await getUserById(userId);
+ const user = await getSessionUser(cookies().get(getUserCookieName())?.value);
  if (!user) redirect("/login");
 
  return (

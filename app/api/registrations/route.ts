@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getUserCookieName, getUserIdFromSessionToken } from "@/lib/userAuth";
+import { getUserCookieName } from "@/lib/userAuth";
+import { getSessionUser } from "@/lib/users";
 import { parseRegistrationInput, toOrderNotes } from "@/lib/registrationInput";
 import { persistRegistration, resolveEventForRegistration } from "@/lib/createRegistration";
+import { RATE_LIMITS, checkRateLimit, clientKey, tooManyRequests } from "@/lib/rateLimit";
 
 /**
  * Starts a registration.
@@ -13,6 +15,9 @@ import { persistRegistration, resolveEventForRegistration } from "@/lib/createRe
  * abandoned checkout leaves nothing behind.
  */
 export async function POST(request: Request) {
+  const limit = await checkRateLimit(clientKey(request, "registration"), RATE_LIMITS.registration);
+  if (!limit.allowed) return tooManyRequests(limit.retryAfter, "Too many registrations from this network. Try again later.");
+
   let payload: unknown;
   try {
     payload = await request.json();
@@ -26,7 +31,8 @@ export async function POST(request: Request) {
   const { resolved, error: resolveError, status } = await resolveEventForRegistration(input);
   if (resolveError || !resolved) return NextResponse.json({ error: resolveError }, { status: status ?? 400 });
 
-  const userId = getUserIdFromSessionToken(cookies().get(getUserCookieName())?.value);
+  const sessionUser = await getSessionUser(cookies().get(getUserCookieName())?.value);
+  const userId = sessionUser?.id ?? null;
 
   // Free event: nothing to pay, so the spot is secured immediately.
   if (resolved.amount <= 0) {

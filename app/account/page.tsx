@@ -4,8 +4,8 @@ import Link from "next/link";
 import { ArrowLeft, LogOut, MapPin } from "lucide-react";
 import RegistrationPass from "@/components/RegistrationPass";
 import { buttonStyles } from "@/components/ui/Button";
-import { getUserCookieName, getUserIdFromSessionToken } from "@/lib/userAuth";
-import { getUserById, getUserRegistrations } from "@/lib/users";
+import { getUserCookieName } from "@/lib/userAuth";
+import { getSessionUser, getUserRegistrations } from "@/lib/users";
 import copy from "@/content/en.json";
 
 export const dynamic = "force-dynamic";
@@ -13,14 +13,10 @@ export const dynamic = "force-dynamic";
 const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 export default async function AccountPage() {
-  const token = cookies().get(getUserCookieName())?.value;
-  const userId = getUserIdFromSessionToken(token);
-  if (!userId) redirect("/login");
-
-  const user = await getUserById(userId);
+  const user = await getSessionUser(cookies().get(getUserCookieName())?.value);
   if (!user) redirect("/login");
 
-  const registrations = await getUserRegistrations(userId);
+  const registrations = await getUserRegistrations(user.id);
 
   return (
     <main className="min-h-screen bg-bg px-5 py-6 sm:px-10 sm:py-10">

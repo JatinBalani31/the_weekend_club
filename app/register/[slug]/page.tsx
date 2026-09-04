@@ -4,8 +4,8 @@ import { ArrowLeft, MapPin } from "lucide-react";
 import { notFound } from "next/navigation";
 import RegistrationForm from "@/components/RegistrationForm";
 import { getUpcomingEventBySlug } from "@/lib/events";
-import { getUserCookieName, getUserIdFromSessionToken } from "@/lib/userAuth";
-import { getUserById } from "@/lib/users";
+import { getUserCookieName } from "@/lib/userAuth";
+import { getSessionUser } from "@/lib/users";
 import copy from "@/content/en.json";
 
 const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "full", timeStyle: "short" });
@@ -14,8 +14,7 @@ export default async function RegisterPage({ params }: { params: { slug: string 
  const event = await getUpcomingEventBySlug(params.slug);
  if (!event) notFound();
 
- const userId = getUserIdFromSessionToken(cookies().get(getUserCookieName())?.value);
- const user = userId ? await getUserById(userId) : null;
+ const user = await getSessionUser(cookies().get(getUserCookieName())?.value);
 
  return (
  <main className="min-h-screen bg-bg px-5 py-6 sm:px-10 sm:py-10">

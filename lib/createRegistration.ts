@@ -108,6 +108,10 @@ export async function persistRegistration(params: {
     const { data, error } = await supabase.from("registrations").insert(row).select("id").single();
     if (!error) return { registrationId: data.id, created: true };
 
+    // Raised by the registrations_enforce_capacity trigger.
+    if (error.message?.includes("EVENT_FULL")) return { error: "This event is now full." };
+    if (error.message?.includes("TIER_FULL")) return { error: "That ticket tier is now sold out." };
+
     if (error.code !== "23505") {
       console.error("Unable to create registration", error);
       return { error: "Could not save your registration." };

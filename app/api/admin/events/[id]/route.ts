@@ -4,7 +4,7 @@ import { deleteEventIfEmpty, setEventActive, updateEventWithTiers } from "@/lib/
 import { parseEventInput } from "@/lib/eventValidation";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  if (!isAdminRequestAuthorized()) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await isAdminRequestAuthorized())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
   let payload: unknown;
   try { payload = await request.json(); } catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
-  if (!isAdminRequestAuthorized()) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await isAdminRequestAuthorized())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
   const result = await deleteEventIfEmpty(params.id);
   if (result.error) return NextResponse.json({ error: result.error }, { status: 409 });

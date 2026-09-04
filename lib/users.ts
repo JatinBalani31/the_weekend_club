@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from "@/lib/supabase";
-import { hashPassword } from "@/lib/userAuth";
+import { hashPassword, parseUserSessionToken } from "@/lib/userAuth";
 import { registrationCodeFromId } from "@/lib/registrationCode";
+import { hasColumn } from "@/lib/schemaProbe";
 import { hasRegistrationCodeColumn } from "@/lib/registrations";
 import {
   devCreateUser,
@@ -34,7 +35,7 @@ export type UserRegistration = {
 
 export async function createUser(input: { name: string; email: string; phone: string; password: string }): Promise<{ user?: PublicUser; error?: string }> {
   if (isDevStoreEnabled()) {
-    const { user, error } = devCreateUser({ name: input.name, email: input.email, phone: input.phone, password_hash: hashPassword(input.password) });
+    const { user, error } = devCreateUser({ name: input.name, email: input.email, phone: input.phone, password_hash: await hashPassword(input.password) });
     if (error || !user) return { error: error ?? "Could not create your account." };
     return { user: { id: user.id, name: user.name, email: user.email, phone: user.phone } };
   }
@@ -50,7 +51,7 @@ export async function createUser(input: { name: string; email: string; phone: st
 
   const { data, error } = await supabase
     .from("users")
-    .insert({ name: input.name, email: input.email, phone: input.phone, password_hash: hashPassword(input.password) })
+    .insert({ name: input.name, email: input.email, phone: input.phone, password_hash: await hashPassword(input.password) })
     .select("id, name, email, phone")
     .single();
 
@@ -96,11 +97,73 @@ export async function getUserById(id: string): Promise<PublicUser | null> {
   return data as PublicUser | null;
 }
 
-export async function updateUser(id: string, patch: { name: string; email: string; phone: string; password?: string }): Promise<{ error?: string }> {
-  const passwordHash = patch.password ? hashPassword(patch.password) : undefined;
+/**
+ * Resolves the signed session cookie to an account, refusing tokens issued
+ * before the account's `sessions_valid_from`. That timestamp is what makes
+ * "log out everywhere" and "a password change ends other sessions" actually
+ * work - without the check a stolen token stays valid until it expires.
+ */
+export async function getSessionUser(token: string | undefined): Promise<PublicUser | null> {
+  const session = parseUserSessionToken(token);
+  if (!session) return null;
 
   if (isDevStoreEnabled()) {
-    const { error } = devUpdateUser(id, { name: patch.name, email: patch.email, phone: patch.phone, password_hash: passwordHash });
+    const user = devGetUserById(session.userId);
+    if (!user) return null;
+    const validFrom = user.sessions_valid_from ? new Date(user.sessions_valid_from) : null;
+    if (validFrom && session.issuedAt < validFrom) return null;
+    return { id: user.id, name: user.name, email: user.email, phone: user.phone };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return null;
+
+  // Tolerates the security-hardening migration not being applied yet; without
+  // the guard a pending migration would fail every lookup and lock everyone out.
+  const revocable = await hasColumn(supabase, "users", "sessions_valid_from");
+
+  const { data, error } = await supabase
+    .from("users")
+    .select(revocable ? "id, name, email, phone, sessions_valid_from" : "id, name, email, phone")
+    .eq("id", session.userId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  // The select list is chosen at runtime, so Supabase cannot infer the shape.
+  const row = data as unknown as PublicUser & { sessions_valid_from?: string | null };
+
+  const validFrom = row.sessions_valid_from ? new Date(row.sessions_valid_from) : null;
+  // Tokens are second-granularity on the database side; allow a small skew so a
+  // token minted in the same second as the timestamp is not rejected.
+  if (validFrom && session.issuedAt.getTime() < validFrom.getTime() - 1000) return null;
+
+  return { id: row.id, name: row.name, email: row.email, phone: row.phone };
+}
+
+/** Ends every existing session for an account. */
+export async function revokeUserSessions(id: string): Promise<{ error?: string }> {
+  if (isDevStoreEnabled()) {
+    devUpdateUser(id, { sessions_valid_from: new Date().toISOString() });
+    return {};
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return { error: "Accounts are not configured yet." };
+
+  const { error } = await supabase.from("users").update({ sessions_valid_from: new Date().toISOString() }).eq("id", id);
+  if (error) {
+    console.error("Unable to revoke sessions", error);
+    return { error: "Could not sign out your other devices." };
+  }
+  return {};
+}
+
+export async function updateUser(id: string, patch: { name: string; email: string; phone: string; password?: string }): Promise<{ error?: string }> {
+  const passwordHash = patch.password ? await hashPassword(patch.password) : undefined;
+
+  if (isDevStoreEnabled()) {
+    const { error } = devUpdateUser(id, { name: patch.name, email: patch.email, phone: patch.phone, password_hash: passwordHash, ...(passwordHash ? { sessions_valid_from: new Date().toISOString() } : {}) });
     return error ? { error } : {};
   }
 
@@ -115,7 +178,14 @@ export async function updateUser(id: string, patch: { name: string; email: strin
 
   const { error } = await supabase
     .from("users")
-    .update({ name: patch.name, email: patch.email, phone: patch.phone, ...(passwordHash ? { password_hash: passwordHash } : {}) })
+    .update({
+      name: patch.name,
+      email: patch.email,
+      phone: patch.phone,
+      // Changing the password ends every other session, so a leaked password
+      // cannot keep an attacker signed in after the owner rotates it.
+      ...(passwordHash ? { password_hash: passwordHash, sessions_valid_from: new Date().toISOString() } : {}),
+    })
     .eq("id", id);
 
   if (error) {

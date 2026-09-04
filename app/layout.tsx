@@ -4,8 +4,8 @@ import { cookies } from "next/headers";
 import { Bebas_Neue, Inter } from "next/font/google";
 import NavBar from "@/components/NavBar";
 import { getAdminCookieName, isValidAdminSession } from "@/lib/admin";
-import { getUserCookieName, getUserIdFromSessionToken } from "@/lib/userAuth";
-import { getUserById } from "@/lib/users";
+import { getUserCookieName } from "@/lib/userAuth";
+import { getSessionUser } from "@/lib/users";
 import copy from "@/content/en.json";
 import "./globals.css";
 
@@ -36,9 +36,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = cookies();
-  const userId = getUserIdFromSessionToken(cookieStore.get(getUserCookieName())?.value);
-  const user = userId ? await getUserById(userId) : null;
-  const isAdmin = isValidAdminSession(cookieStore.get(getAdminCookieName())?.value);
+  const user = await getSessionUser(cookieStore.get(getUserCookieName())?.value);
+  const isAdmin = await isValidAdminSession(cookieStore.get(getAdminCookieName())?.value);
 
   return (
     <html lang="en">

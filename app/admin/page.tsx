@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const session = cookies().get(getAdminCookieName())?.value;
-  if (!isValidAdminSession(session)) return <AdminLogin />;
+  if (!(await isValidAdminSession(session))) return <AdminLogin />;
 
   const [registrations, events] = await Promise.all([getAllRegistrations(), getAllEventsAdmin()]);
 
