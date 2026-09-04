@@ -7,8 +7,7 @@ import { getUpcomingEventBySlug } from "@/lib/events";
 import { getUserCookieName } from "@/lib/userAuth";
 import { getSessionUser } from "@/lib/users";
 import copy from "@/content/en.json";
-
-const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "full", timeStyle: "short" });
+import { eventDateTimeFormatter as dateFormatter } from "@/lib/dateTime";
 
 export default async function RegisterPage({ params }: { params: { slug: string } }) {
  const event = await getUpcomingEventBySlug(params.slug);

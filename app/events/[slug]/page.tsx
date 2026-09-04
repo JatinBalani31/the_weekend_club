@@ -6,8 +6,7 @@ import copy from "@/content/en.json";
 import EventBanner from "@/components/EventBanner";
 import Badge from "@/components/ui/Badge";
 import { buttonStyles } from "@/components/ui/Button";
-
-const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "full", timeStyle: "short" });
+import { eventDateTimeFormatter as dateFormatter } from "@/lib/dateTime";
 
 export default async function EventDetailPage({ params }: { params: { slug: string } }) {
   const event = await getUpcomingEventBySlug(params.slug);

@@ -7,10 +7,10 @@ import { buttonStyles } from "@/components/ui/Button";
 import { getUserCookieName } from "@/lib/userAuth";
 import { getSessionUser, getUserRegistrations } from "@/lib/users";
 import copy from "@/content/en.json";
+import { eventDateTimeShortFormatter as dateFormatter } from "@/lib/dateTime";
 
 export const dynamic = "force-dynamic";
 
-const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 export default async function AccountPage() {
   const user = await getSessionUser(cookies().get(getUserCookieName())?.value);

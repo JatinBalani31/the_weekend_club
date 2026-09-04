@@ -7,21 +7,16 @@ import copy from "@/content/en.json";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { fieldStyles, fieldErrorStyles } from "@/components/ui/Input";
+import { istDatetimeLocalToUtcIso, utcIsoToIstDatetimeLocal } from "@/lib/dateTime";
 
 type TierRow = { name: string; price: string; capacity: string; sale_ends_at: string; is_active: boolean };
-
-function toDatetimeLocal(value: string) {
-  const date = new Date(value);
-  const offsetMs = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-}
 
 function tiersToRows(tiers: TicketTier[] | undefined): TierRow[] {
   return (tiers ?? []).map((tier) => ({
     name: tier.name,
     price: String(tier.price),
     capacity: String(tier.capacity),
-    sale_ends_at: tier.sale_ends_at ? toDatetimeLocal(tier.sale_ends_at) : "",
+    sale_ends_at: tier.sale_ends_at ? utcIsoToIstDatetimeLocal(tier.sale_ends_at) : "",
     is_active: tier.is_active,
   }));
 }
@@ -31,7 +26,7 @@ export default function EventForm({ event, onClose }: { event?: Event; onClose: 
   const [title, setTitle] = useState(event?.title ?? "");
   const [description, setDescription] = useState(event?.description ?? "");
   const [bannerImageUrl, setBannerImageUrl] = useState(event?.banner_image_url ?? "");
-  const [date, setDate] = useState(event ? toDatetimeLocal(event.date) : "");
+  const [date, setDate] = useState(event ? utcIsoToIstDatetimeLocal(event.date) : "");
   const [location, setLocation] = useState(event?.location ?? "");
   const [price, setPrice] = useState(event ? String(event.price) : "0");
   const [capacity, setCapacity] = useState(event ? String(event.capacity) : "50");
@@ -63,13 +58,13 @@ export default function EventForm({ event, onClose }: { event?: Event; onClose: 
       title,
       description,
       banner_image_url: bannerImageUrl,
-      date: date ? new Date(date).toISOString() : "",
+      date: date ? istDatetimeLocalToUtcIso(date) : "",
       location,
       price: Number(price),
       capacity: Number(capacity),
       event_type: eventType,
       is_active: isActive,
-      ticket_tiers: tiers.map((tier) => ({ name: tier.name, price: Number(tier.price), capacity: Number(tier.capacity), sale_ends_at: tier.sale_ends_at ? new Date(tier.sale_ends_at).toISOString() : null, is_active: tier.is_active })),
+      ticket_tiers: tiers.map((tier) => ({ name: tier.name, price: Number(tier.price), capacity: Number(tier.capacity), sale_ends_at: tier.sale_ends_at ? istDatetimeLocalToUtcIso(tier.sale_ends_at) : null, is_active: tier.is_active })),
     };
 
     const response = await fetch(event ? `/api/admin/events/${event.id}` : "/api/admin/events", {
@@ -94,7 +89,7 @@ export default function EventForm({ event, onClose }: { event?: Event; onClose: 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Title"><input value={title} onChange={(e) => setTitle(e.target.value)} required className={fieldStyles} /></Field>
         <Field label="Location"><input value={location} onChange={(e) => setLocation(e.target.value)} required className={fieldStyles} /></Field>
-        <Field label="Date and time"><input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} required className={fieldStyles} /></Field>
+        <Field label="Date and time (IST)"><input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} required className={fieldStyles} /></Field>
         <Field label="Event type">
           <select value={eventType} onChange={(e) => setEventType(e.target.value as EventType)} className={fieldStyles}>
             <option value="run">Run</option>

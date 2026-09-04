@@ -6,8 +6,8 @@ import type { Event } from "@/lib/events";
 import type { AdminRegistration } from "@/lib/registrations";
 import EventForm from "@/components/EventForm";
 import copy from "@/content/en.json";
+import { eventDateTimeShortFormatter as dateFormatter } from "@/lib/dateTime";
 
-const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 export default function AdminEventManager({ events, registrations }: { events: Event[]; registrations: AdminRegistration[] }) {
   const router = useRouter();

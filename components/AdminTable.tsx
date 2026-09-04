@@ -5,8 +5,8 @@ import * as XLSX from "xlsx";
 import type { AdminRegistration } from "@/lib/registrations";
 import AdminSummary from "@/components/AdminSummary";
 import copy from "@/content/en.json";
+import { eventDateTimeShortFormatter as dateFormatter } from "@/lib/dateTime";
 
-const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 export default function AdminTable({ registrations }: { registrations: AdminRegistration[] }) {
   const [eventFilter, setEventFilter] = useState("all");

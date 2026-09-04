@@ -6,10 +6,9 @@ import { buttonStyles } from "@/components/ui/Button";
 import { getRegistrationById } from "@/lib/registrations";
 import { COMMUNITY_LINKS } from "@/lib/site";
 import copy from "@/content/en.json";
+import { eventDateTimeFormatter as dateFormatter } from "@/lib/dateTime";
 
 export const metadata = { title: copy.success.metadataTitle };
-
-const dateFormatter = new Intl.DateTimeFormat("en-IN", { dateStyle: "full", timeStyle: "short" });
 
 export default async function SuccessPage({ searchParams }: { searchParams: { registration_id?: string } }) {
   const registration = searchParams.registration_id ? await getRegistrationById(searchParams.registration_id) : null;

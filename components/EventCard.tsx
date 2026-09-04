@@ -6,12 +6,7 @@ import EventBanner from "@/components/EventBanner";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import { buttonStyles } from "@/components/ui/Button";
-
-const dateFormatter = new Intl.DateTimeFormat("en-IN", {
-  day: "numeric",
-  month: "short",
-  weekday: "short",
-});
+import { eventCardDateFormatter as dateFormatter } from "@/lib/dateTime";
 
 export default function EventCard({ event }: { event: Event }) {
   return (
