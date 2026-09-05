@@ -25,17 +25,72 @@ type PrefillUser = { name: string; email: string; phone: string };
  */
 const CHECKOUT_THEME_COLOR = "#0A0A0B";
 
+/**
+ * Set when a payment succeeded but turning it into a registration did not, so
+ * the payer can retry instead of being left with a charge and no spot.
+ */
+type PendingPayment = {
+  /** Replayed verbatim on retry; the server re-derives everything else. */
+  payment: RazorpayPaymentResponse;
+  paymentId: string;
+  retryable: boolean;
+  refunded: boolean;
+};
+
 export default function RegistrationForm({ eventSlug, tiers = [], user }: { eventSlug: string; tiers?: { id: string; name: string; price: number }[]; user?: PrefillUser }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ mode: "onBlur", defaultValues: user ? { name: user.name, email: user.email, phone: user.phone } : undefined });
 
+  /**
+   * Confirms a completed payment with the server. Safe to call again with the
+   * same payment: the write is keyed on the Razorpay order id, so a retry
+   * returns the existing registration rather than creating a second one.
+   */
+  async function confirmPayment(payment: RazorpayPaymentResponse) {
+    const verification = await fetch("/api/verify-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payment),
+    });
+    const result = await verification.json();
+
+    if (verification.ok && result.registrationId) {
+      setPendingPayment(null);
+      window.location.assign(`/success?registration_id=${encodeURIComponent(result.registrationId)}`);
+      return true;
+    }
+
+    // The money left their account, so keep the reference on screen and offer a
+    // way forward rather than just showing an error.
+    setSubmitError(result.error ?? copy.registration.paymentVerifyError);
+    setPendingPayment({
+      payment,
+      paymentId: result.paymentId ?? payment.razorpay_payment_id,
+      retryable: result.retryable !== false,
+      refunded: Boolean(result.refunded),
+    });
+    setIsProcessing(false);
+    return false;
+  }
+
+  async function retryConfirmation() {
+    if (!pendingPayment) return;
+    setIsRetrying(true);
+    setSubmitError(null);
+    await confirmPayment(pendingPayment.payment);
+    setIsRetrying(false);
+  }
+
   async function onSubmit(values: FormValues) {
     setSubmitError(null);
+    setPendingPayment(null);
     setIsProcessing(true);
     try {
       // Free events are saved by this call. Paid events only get a Razorpay
@@ -74,18 +129,7 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
         },
         handler: async (payment: RazorpayPaymentResponse) => {
           // The registration row is created here, once the payment is verified.
-          const verification = await fetch("/api/verify-payment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payment),
-          });
-          const verificationResult = await verification.json();
-          if (!verification.ok || !verificationResult.registrationId) {
-            setSubmitError(verificationResult.error ?? copy.registration.paymentVerifyError);
-            setIsProcessing(false);
-            return;
-          }
-          window.location.assign(`/success?registration_id=${encodeURIComponent(verificationResult.registrationId)}`);
+          await confirmPayment(payment);
         },
         modal: { ondismiss: () => { setSubmitError(copy.registration.paymentCancelled); setIsProcessing(false); } },
       });
@@ -174,6 +218,38 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
           <p role="alert" className="rounded-xl border border-error/40 bg-error/10 p-4 font-body text-sm text-error">
             {submitError}
           </p>
+        )}
+
+        {/*
+          The payer has been charged but has no spot yet. Show the reference so
+          they can quote it, and offer a retry when one could actually succeed -
+          retrying is safe because the write is keyed on the Razorpay order id.
+        */}
+        {pendingPayment && (
+          <div
+            role="status"
+            className={`rounded-xl border p-4 font-body text-sm ${pendingPayment.refunded ? "border-border bg-surface text-text-muted" : "border-accent/40 bg-accent/10 text-text"}`}
+          >
+            <p className="font-semibold uppercase tracking-[0.12em] text-xs">
+              {pendingPayment.refunded ? copy.registration.paymentRefunded : copy.registration.paymentNeedsAttention}
+            </p>
+            <p className="mt-2 leading-relaxed">
+              {copy.registration.quotePaymentId}{" "}
+              <span className="select-all font-mono text-accent">{pendingPayment.paymentId}</span>
+            </p>
+            {pendingPayment.retryable && !pendingPayment.refunded && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={retryConfirmation}
+                isLoading={isRetrying}
+                className="mt-4"
+              >
+                {isRetrying ? copy.registration.retrying : copy.registration.retryConfirmation}
+              </Button>
+            )}
+          </div>
         )}
 
         <Button type="submit" size="lg" isLoading={isBusy} className="w-full">

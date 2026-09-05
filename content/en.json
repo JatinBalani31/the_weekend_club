@@ -147,7 +147,12 @@
     "paymentCancelled": "Payment cancelled. You can submit again to retry.",
     "checkoutLoadError": "Could not load payment checkout.",
     "paymentFailed": "Payment failed. You have not been charged.",
-    "amountTooSmall": "The ticket price must be at least INR 1, or set it to 0 for a free event."
+    "amountTooSmall": "The ticket price must be at least INR 1, or set it to 0 for a free event.",
+    "paymentNeedsAttention": "Your payment went through",
+    "paymentRefunded": "Payment refunded",
+    "quotePaymentId": "Keep this payment reference if you need to contact us:",
+    "retryConfirmation": "Try confirming again",
+    "retrying": "Confirming..."
   },
   "account": {
     "title": "My account",

@@ -37,8 +37,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Payment verification failed." }, { status: 400 });
   }
 
-  const { registrationId, error, status } = await completePaidRegistration(orderId, paymentId);
-  if (error || !registrationId) return NextResponse.json({ error }, { status: status ?? 500 });
+  const result = await completePaidRegistration(orderId, paymentId);
+  if (result.error || !result.registrationId) {
+    // `retryable` tells the browser whether offering "try again" is honest: a
+    // refunded or already-settled failure cannot be retried into success.
+    const retryable = (result.status ?? 500) >= 500;
+    return NextResponse.json(
+      { error: result.error, paymentId: result.paymentId ?? paymentId, refunded: result.refunded ?? false, retryable },
+      { status: result.status ?? 500 },
+    );
+  }
 
-  return NextResponse.json({ verified: true, registrationId });
+  return NextResponse.json({ verified: true, registrationId: result.registrationId });
 }
