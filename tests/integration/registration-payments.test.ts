@@ -197,3 +197,70 @@ describe("capacity enforcement", () => {
     expect(data?.length, "capacity of 1 must mean exactly 1 registration").toBe(1);
   });
 });
+
+describe("a full event never takes money", () => {
+  it("refuses before opening checkout, rather than charging then refunding", async () => {
+    // Previously a full paid event still created a Razorpay order: the payer was
+    // charged, the capacity trigger then rejected the insert, and the charge had
+    // to be refunded. Cheaper and kinder to refuse up front.
+    const event = await createEvent({ price: 200, capacity: 1 });
+
+    const first = await api("/api/registrations", {
+      method: "POST",
+      body: JSON.stringify({ eventSlug: event.slug, name: "First", email: testEmail("capfill"), phone: testPhone() }),
+    });
+    // Paid event, so this only opens checkout; fill the spot directly instead.
+    expect(first.status).toBe(200);
+
+    await admin().from("registrations").insert({
+      event_id: event.id, name: "Occupier", email: testEmail("occupier"),
+      phone: testPhone(), payment_status: "paid", charged_price: 200,
+    });
+
+    const blocked = await api("/api/registrations", {
+      method: "POST",
+      body: JSON.stringify({ eventSlug: event.slug, name: "Too Late", email: testEmail("toolate"), phone: testPhone() }),
+    });
+
+    expect(blocked.status).toBe(409);
+    expect(String(blocked.body.error)).toMatch(/full/i);
+    expect(blocked.body.orderId, "no Razorpay order should exist for a full event").toBeUndefined();
+  });
+});
+
+describe("registering twice", () => {
+  it("returns the existing registration instead of creating a second", async () => {
+    // Guards against a double-submit or refresh becoming a second charge.
+    const event = await createEvent({ price: 0, capacity: 50 });
+    const email = testEmail("double");
+
+    const first = await api("/api/registrations", {
+      method: "POST",
+      body: JSON.stringify({ eventSlug: event.slug, name: "Double Probe", email, phone: testPhone() }),
+    });
+    const second = await api("/api/registrations", {
+      method: "POST",
+      body: JSON.stringify({ eventSlug: event.slug, name: "Double Probe", email, phone: testPhone() }),
+    });
+
+    expect(first.status).toBe(201);
+    expect(second.body.alreadyRegistered).toBe(true);
+    expect(second.body.registrationId).toBe(first.body.registrationId);
+
+    const { data } = await admin().from("registrations").select("id").eq("event_id", event.id);
+    expect(data?.length, "one person, one spot").toBe(1);
+  });
+
+  it("still lets a different person register for the same event", async () => {
+    const event = await createEvent({ price: 0, capacity: 50 });
+    for (const label of ["personA", "personB"]) {
+      const { status } = await api("/api/registrations", {
+        method: "POST",
+        body: JSON.stringify({ eventSlug: event.slug, name: label, email: testEmail(label), phone: testPhone() }),
+      });
+      expect(status).toBe(201);
+    }
+    const { data } = await admin().from("registrations").select("id").eq("event_id", event.id);
+    expect(data?.length).toBe(2);
+  });
+});

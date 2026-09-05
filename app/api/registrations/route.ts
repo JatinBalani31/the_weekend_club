@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getUserCookieName } from "@/lib/userAuth";
 import { getSessionUser } from "@/lib/users";
 import { parseRegistrationInput, toOrderNotes } from "@/lib/registrationInput";
-import { persistRegistration, resolveEventForRegistration } from "@/lib/createRegistration";
+import { findExistingRegistration, persistRegistration, resolveEventForRegistration } from "@/lib/createRegistration";
 import { RATE_LIMITS, checkRateLimit, clientKey, tooManyRequests } from "@/lib/rateLimit";
 import copy from "@/content/en.json";
 
@@ -34,6 +34,17 @@ export async function POST(request: Request) {
 
   const sessionUser = await getSessionUser(cookies().get(getUserCookieName())?.value);
   const userId = sessionUser?.id ?? null;
+
+  // Already booked: return the existing registration rather than creating a
+  // second one. On a paid event this is what stops a double-submit or a refresh
+  // turning into a second charge.
+  const existing = await findExistingRegistration(resolved.event.id, input.email);
+  if (existing) {
+    return NextResponse.json(
+      { free: true, alreadyRegistered: true, registrationId: existing.id },
+      { status: 200 },
+    );
+  }
 
   // Free event: nothing to pay, so the spot is secured immediately.
   if (resolved.amount <= 0) {

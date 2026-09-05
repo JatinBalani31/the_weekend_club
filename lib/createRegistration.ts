@@ -24,7 +24,80 @@ export async function resolveEventForRegistration(input: RegistrationInput): Pro
 
   if (event.ticket_tiers?.length && !tier) return { error: "Choose an available ticket tier.", status: 400 };
 
+  // Check remaining space before the caller opens checkout. The database
+  // trigger is still the authority - it locks the event row, so it is what
+  // makes two simultaneous registrations safe - but without this check a full
+  // event would open Razorpay, take the money, and only then be rejected and
+  // refunded. Better not to charge at all.
+  const taken = await countPaidRegistrations(event.id, tier?.id ?? null);
+  if (taken.event >= event.capacity) return { error: "This event is now full.", status: 409 };
+  if (tier && taken.tier !== null && taken.tier >= tier.capacity) {
+    return { error: "That ticket tier is now sold out.", status: 409 };
+  }
+
   return { resolved: { event, tier, amount: Number(tier?.price ?? event.price) } };
+}
+
+/** Counts confirmed registrations against an event, and its tier if given. */
+async function countPaidRegistrations(eventId: string, tierId: string | null) {
+  if (isDevStoreEnabled()) {
+    const rows = devGetAllRegistrations().filter((item) => item.payment_status === "paid");
+    return {
+      event: rows.filter((item) => item.event_id === eventId).length,
+      tier: tierId ? rows.filter((item) => item.ticket_tier_id === tierId).length : null,
+    };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return { event: 0, tier: null };
+
+  const { count: eventCount } = await supabase
+    .from("registrations")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", eventId)
+    .eq("payment_status", "paid");
+
+  let tierCount: number | null = null;
+  if (tierId) {
+    const { count } = await supabase
+      .from("registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("ticket_tier_id", tierId)
+      .eq("payment_status", "paid");
+    tierCount = count ?? 0;
+  }
+
+  return { event: eventCount ?? 0, tier: tierCount };
+}
+
+/**
+ * Finds an existing confirmed registration for this person on this event.
+ *
+ * Without this the same person could register twice - harmless noise on a free
+ * event, but a second charge on a paid one, and easy to trigger by
+ * double-submitting or refreshing. Matching on email keeps it predictable for
+ * the attendee, who is told about the booking they already hold.
+ */
+export async function findExistingRegistration(eventId: string, email: string): Promise<{ id: string; registration_code?: string } | null> {
+  if (isDevStoreEnabled()) {
+    const existing = devGetAllRegistrations().find(
+      (item) => item.event_id === eventId && item.email === email && item.payment_status === "paid",
+    );
+    return existing ? { id: existing.id, registration_code: existing.registration_code } : null;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return null;
+
+  const { data } = await supabase
+    .from("registrations")
+    .select("id")
+    .eq("event_id", eventId)
+    .eq("email", email)
+    .eq("payment_status", "paid")
+    .maybeSingle();
+
+  return data ? { id: data.id } : null;
 }
 
 /**
