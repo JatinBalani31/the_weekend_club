@@ -14,8 +14,12 @@ describe("registration codes", () => {
   });
 
   it("does not repeat across a realistic number of registrations", () => {
-    const codes = new Set(Array.from({ length: 5000 }, generateRegistrationCode));
-    expect(codes.size).toBe(5000);
+    // 6 chars over a 32-char alphabet is ~1.07 billion combinations; 5000 draws
+    // sits comfortably below the birthday-bound collision risk, but is not
+    // exactly zero, so tolerate one collision rather than assert perfection.
+    const codes = Array.from({ length: 5000 }, generateRegistrationCode);
+    const unique = new Set(codes);
+    expect(unique.size).toBeGreaterThanOrEqual(codes.length - 1);
   });
 
   it("derives a stable fallback code from a row id", () => {

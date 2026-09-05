@@ -190,11 +190,31 @@ export async function persistRegistration(params: {
       return { error: "Could not save your registration." };
     }
 
-    // A duplicate on the order id means a concurrent callback already inserted it.
-    if (razorpayOrderId) {
+    // 23505 can come from three different constraints, and only one of them
+    // means "generate a fresh code and retry" - the other two mean a concurrent
+    // request already won, and the right answer is to hand back its row.
+
+    // A concurrent callback for the SAME order already inserted it.
+    if (razorpayOrderId && error.message?.includes("razorpay_order_id")) {
       const { data: existing } = await supabase.from("registrations").select("id").eq("razorpay_order_id", razorpayOrderId).maybeSingle();
       if (existing) return { registrationId: existing.id, created: false };
     }
+
+    // A concurrent request for the SAME person on the SAME event won the race.
+    // This is what makes the email+event uniqueness atomic: the application
+    // check earlier is only a fast path, not the guarantee.
+    if (error.message?.includes("registrations_one_paid_per_email_per_event")) {
+      const { data: existing } = await supabase
+        .from("registrations")
+        .select("id")
+        .eq("event_id", resolved.event.id)
+        .eq("email", input.email)
+        .eq("payment_status", "paid")
+        .maybeSingle();
+      if (existing) return { registrationId: existing.id, created: false };
+    }
+
+    // Otherwise this was a registration_code collision - loop and try a new one.
   }
 
   console.error("Unable to allocate a unique registration code after 3 attempts");
