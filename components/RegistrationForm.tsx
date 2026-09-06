@@ -108,9 +108,18 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
         return;
       }
 
+      // Refuse to open checkout unlinked. A standalone payment cannot be
+      // verified or matched to a registration, so taking money that way is
+      // worse than not taking it at all.
+      if (!order.orderId) throw new Error(copy.registration.paymentStartError);
+
       await loadRazorpayScript();
       const checkout = new window.Razorpay({
         key: order.keyId,
+        // Without this the payment is standalone: Razorpay never ties it to the
+        // order we raised, returns no verifiable signature, and leaves the money
+        // authorised but uncaptured. Every server-side check depends on it.
+        order_id: order.orderId,
         amount: order.amount,
         currency: order.currency,
         name: copy.brand.name,
@@ -286,6 +295,8 @@ type RazorpayFailureResponse = {
 
 type RazorpayOptions = {
   key: string;
+  /** Required: binds the payment to a server-created order. */
+  order_id: string;
   amount: number;
   currency: string;
   name: string;

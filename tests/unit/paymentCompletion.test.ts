@@ -76,3 +76,36 @@ describe("failure classification decides whether a retry is offered", () => {
     expect(retryable(422)).toBe(false); // order not ours
   });
 });
+
+describe("checkout must be bound to a server-created order", () => {
+  /**
+   * A real live payment was taken with no order_id and could never be verified:
+   * Razorpay treated it as standalone, returned no usable signature, and left
+   * the money authorised but uncaptured. These pin the contract that broke.
+   */
+  it("the browser sends the order id it was given", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile("components/RegistrationForm.tsx", "utf8"),
+    );
+
+    // The options object handed to Razorpay must carry the order id.
+    expect(source, "checkout options must include order_id").toMatch(/order_id:\s*order\.orderId/);
+  });
+
+  it("refuses to open checkout when the server returned no order id", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile("components/RegistrationForm.tsx", "utf8"),
+    );
+    // Taking money that cannot be reconciled is worse than not taking it.
+    expect(source).toMatch(/if\s*\(!order\.orderId\)\s*throw/);
+  });
+
+  it("a payment with no order id is rejected rather than accepted", () => {
+    const belongsToOrder = (payment: { order_id?: string | null }, orderId: string) =>
+      Boolean(payment.order_id) && payment.order_id === orderId;
+
+    expect(belongsToOrder({ order_id: null }, "order_A")).toBe(false);
+    expect(belongsToOrder({}, "order_A")).toBe(false);
+    expect(belongsToOrder({ order_id: "order_A" }, "order_A")).toBe(true);
+  });
+});

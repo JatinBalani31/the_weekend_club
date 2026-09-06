@@ -90,10 +90,12 @@ export async function completePaidRegistration(orderId: string, paymentId: strin
     return { error: "This payment has not completed.", status: 400, paymentId };
   }
 
-  // Binds the payment to the order whose signature we verified, so a payment
-  // from one order cannot be replayed to claim a spot on another.
-  if (payment.order_id && payment.order_id !== orderId) {
-    console.error("Payment does not belong to this order", paymentId, payment.order_id, orderId);
+  // The payment must belong to the order whose signature we verified. Requiring
+  // it (rather than only checking when present) also rejects a standalone
+  // payment, which carries no order at all and can never be reconciled to a
+  // registration - the exact shape of a real failure this guard now covers.
+  if (payment.order_id !== orderId) {
+    console.error("Payment is not bound to this order", paymentId, payment.order_id ?? "(none)", orderId);
     return { error: "Payment verification failed.", status: 400, paymentId };
   }
 
