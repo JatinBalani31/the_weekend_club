@@ -5,6 +5,7 @@ import { hasColumn } from "@/lib/schemaProbe";
 import { hasRegistrationCodeColumn } from "@/lib/registrations";
 import {
   devCreateUser,
+  devFindOrCreateGoogleUser,
   devFindTierName,
   devFindUserByEmailOrPhone,
   devGetEventById,
@@ -32,6 +33,61 @@ export type UserRegistration = {
   event: { title: string; slug: string; date: string; location: string } | null;
   ticket_tier: { name: string } | null;
 };
+
+export async function findOrCreateGoogleUser(input: { googleId: string; email: string; name: string }): Promise<{ user?: PublicUser; needsPhone?: boolean }> {
+  if (isDevStoreEnabled()) {
+    const result = devFindOrCreateGoogleUser(input);
+    if (!result.user) return {};
+    return { user: { id: result.user.id, name: result.user.name, email: result.user.email, phone: result.user.phone }, needsPhone: result.needsPhone };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return {};
+
+  const { data: byGoogle } = await supabase.from("users").select("id, name, email, phone").eq("google_id", input.googleId).maybeSingle();
+  if (byGoogle) return { user: byGoogle };
+
+  const { data: byEmail } = await supabase.from("users").select("id, name, email, phone, google_id").eq("email", input.email).maybeSingle();
+  if (byEmail) {
+    if (!byEmail.google_id) {
+      await supabase.from("users").update({ google_id: input.googleId }).eq("id", byEmail.id);
+    }
+    return { user: { id: byEmail.id, name: byEmail.name, email: byEmail.email, phone: byEmail.phone } };
+  }
+
+  const { data, error } = await supabase
+    .from("users")
+    .insert({ name: input.name, email: input.email, phone: "", google_id: input.googleId })
+    .select("id, name, email, phone")
+    .single();
+
+  if (error || !data) return {};
+  return { user: data, needsPhone: true };
+}
+
+export async function completeGoogleSignup(userId: string, phone: string): Promise<{ user?: PublicUser; error?: string }> {
+  if (isDevStoreEnabled()) {
+    const { user, error } = devUpdateUser(userId, { phone });
+    if (error || !user) return { error: error ?? "Could not save your details." };
+    return { user: { id: user.id, name: user.name, email: user.email, phone: user.phone } };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return { error: "Accounts are not configured yet." };
+
+  const { data: existing } = await supabase.from("users").select("id").eq("phone", phone).neq("id", userId).maybeSingle();
+  if (existing) return { error: "An account with this phone number already exists." };
+
+  const { data, error } = await supabase
+    .from("users")
+    .update({ phone })
+    .eq("id", userId)
+    .select("id, name, email, phone")
+    .single();
+
+  if (error || !data) return { error: "Could not save your details." };
+  return { user: data };
+}
 
 export async function createUser(input: { name: string; email: string; phone: string; password: string }): Promise<{ user?: PublicUser; error?: string }> {
   if (isDevStoreEnabled()) {

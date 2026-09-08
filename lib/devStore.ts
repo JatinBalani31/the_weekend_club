@@ -37,6 +37,7 @@ export type DevUser = {
   email: string;
   phone: string;
   password_hash: string;
+  google_id?: string;
   sessions_valid_from?: string;
   created_at: string;
 };
@@ -224,7 +225,7 @@ export function devCreateUser(input: { name: string; email: string; phone: strin
 
 export function devUpdateUser(
   id: string,
-  patch: { name?: string; email?: string; phone?: string; password_hash?: string; sessions_valid_from?: string },
+  patch: { name?: string; email?: string; phone?: string; password_hash?: string; google_id?: string; sessions_valid_from?: string },
 ) {
   const db = readDb();
   const user = db.users.find((item) => item.id === id);
@@ -236,6 +237,22 @@ export function devUpdateUser(
   if (patch.phone) user.phone = patch.phone;
   if (patch.password_hash) user.password_hash = patch.password_hash;
   if (patch.sessions_valid_from) user.sessions_valid_from = patch.sessions_valid_from;
+  if (patch.google_id) user.google_id = patch.google_id;
   writeDb(db);
   return { user };
+}
+
+export function devFindOrCreateGoogleUser(input: { googleId: string; email: string; name: string }) {
+  const db = readDb();
+  const byGoogle = db.users.find((user) => user.google_id === input.googleId);
+  if (byGoogle) return { user: byGoogle };
+  const byEmail = db.users.find((user) => user.email === input.email);
+  if (byEmail) {
+    if (!byEmail.google_id) { byEmail.google_id = input.googleId; writeDb(db); }
+    return { user: byEmail };
+  }
+  const user: DevUser = { id: crypto.randomUUID(), name: input.name, email: input.email, phone: "", password_hash: "", google_id: input.googleId, created_at: new Date().toISOString() };
+  db.users.push(user);
+  writeDb(db);
+  return { user, needsPhone: true };
 }
