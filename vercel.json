@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/pre-event-notify",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

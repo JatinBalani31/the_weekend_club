@@ -8,12 +8,17 @@ const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LENGTH = 6;
 export const REGISTRATION_CODE_PREFIX = "TWC";
 
-/** Generates a short, human-readable registration number, e.g. "TWC-K4M2P9". */
+/** Generates a random fallback code, e.g. "TWC-K4M2P9". */
 export function generateRegistrationCode() {
   const bytes = crypto.randomBytes(CODE_LENGTH);
   let code = "";
   for (let index = 0; index < CODE_LENGTH; index += 1) code += ALPHABET[bytes[index] % ALPHABET.length];
   return `${REGISTRATION_CODE_PREFIX}-${code}`;
+}
+
+/** Sequential code from a number, e.g. 1 -> "TWC-001", 42 -> "TWC-042". */
+export function sequentialCode(seq: number) {
+  return `${REGISTRATION_CODE_PREFIX}-${String(seq).padStart(3, "0")}`;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { getUpcomingEventBySlug, type Event, type TicketTier } from "@/lib/events";
 import { getSupabaseAdminClient } from "@/lib/supabase";
-import { generateRegistrationCode } from "@/lib/registrationCode";
+import { generateRegistrationCode, sequentialCode } from "@/lib/registrationCode";
 import { hasRegistrationCodeColumn } from "@/lib/registrations";
 import { devCreateRegistration, devGetAllRegistrations, devSetRegistrationPaymentRefs, isDevStoreEnabled } from "@/lib/devStore";
 import type { RegistrationInput } from "@/lib/registrationInput";
@@ -174,9 +174,20 @@ export async function persistRegistration(params: {
 
   const hasCodeColumn = await hasRegistrationCodeColumn(supabase);
 
-  // Registration codes are random, so retry the rare collision before failing.
+  // Compute the next sequential number for this event.
+  if (hasCodeColumn) {
+    const { count } = await supabase
+      .from("registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", resolved.event.id)
+      .eq("payment_status", "paid");
+    const seq = (count ?? 0) + 1;
+    row.seq_number = seq;
+    row.registration_code = sequentialCode(seq);
+  }
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (hasCodeColumn) row.registration_code = generateRegistrationCode();
+    if (hasCodeColumn && attempt > 0) row.registration_code = generateRegistrationCode();
 
     const { data, error } = await supabase.from("registrations").insert(row).select("id").single();
     if (!error) return { registrationId: data.id, created: true };

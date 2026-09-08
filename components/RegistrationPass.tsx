@@ -15,7 +15,9 @@ export default async function RegistrationPass({
   registrationCode: string;
   className?: string;
 }) {
-  const qrDataUrl = await QRCode.toDataURL(registrationCode, {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://theweekendclub.vercel.app";
+  const checkinUrl = `${siteUrl}/admin/checkin?code=${encodeURIComponent(registrationCode)}`;
+  const qrDataUrl = await QRCode.toDataURL(checkinUrl, {
     errorCorrectionLevel: "M",
     margin: 1,
     width: 320,
