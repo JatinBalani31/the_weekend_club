@@ -5,10 +5,11 @@ import EventCard from "@/components/EventCard";
 import Card from "@/components/ui/Card";
 import { buttonStyles } from "@/components/ui/Button";
 import { getUpcomingEvents } from "@/lib/events";
+import { getHeroSlides } from "@/lib/adminSettings";
 import { COMMUNITY_LINKS } from "@/lib/site";
 import copy from "@/content/en.json";
 
-const HERO_SLIDES: HeroSlide[] = [
+const DEFAULT_HERO_SLIDES: HeroSlide[] = [
   { image: "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=2000&q=85", headline: copy.home.slides[0].headline, ctaText: copy.home.slides[0].cta, ctaHref: "/events" },
   { image: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=2000&q=85", headline: copy.home.slides[1].headline, ctaText: copy.home.slides[1].cta, ctaHref: "#about" },
   { image: "https://images.unsplash.com/photo-1502904550040-7534597429ae?auto=format&fit=crop&w=2000&q=85", headline: copy.home.slides[2].headline, ctaText: copy.home.slides[2].cta, ctaHref: COMMUNITY_LINKS.whatsapp },
@@ -27,11 +28,12 @@ const STATS = [
 ];
 
 export default async function Home() {
-  const events = await getUpcomingEvents(3);
+  const [events, dbSlides] = await Promise.all([getUpcomingEvents(3), getHeroSlides()]);
+  const heroSlides: HeroSlide[] = dbSlides && dbSlides.length > 0 ? dbSlides : DEFAULT_HERO_SLIDES;
 
   return (
     <main className="overflow-hidden bg-bg">
-      <HeroCarousel slides={HERO_SLIDES} />
+      <HeroCarousel slides={heroSlides} />
 
       <section id="about" className="mx-auto max-w-7xl px-5 py-20 sm:px-10 sm:py-28">
         <div className="grid gap-10 md:grid-cols-[1fr_1.4fr] md:items-end">
@@ -116,12 +118,6 @@ export default async function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-border px-5 py-8 font-body text-xs font-bold uppercase tracking-[0.16em] text-text-muted sm:px-10">
-        <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-4">
-          <span>{copy.brand.name}</span>
-          <span>{copy.brand.footerLine}</span>
-        </div>
-      </footer>
     </main>
   );
 }

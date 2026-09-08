@@ -44,9 +44,15 @@ export default async function RootLayout({
       <body
         className={`${displayFont.variable} ${bodyFont.variable} bg-bg font-body text-text antialiased`}
       >
-        <div className="min-h-screen pb-[env(safe-area-inset-bottom)]">
+        <div className="flex min-h-screen flex-col pb-[env(safe-area-inset-bottom)]">
           <NavBar isLoggedIn={Boolean(user)} userName={user?.name} isAdmin={isAdmin} />
-          {children}
+          <div className="flex-1">{children}</div>
+          <footer className="border-t border-border px-5 py-8 font-body text-xs font-bold uppercase tracking-[0.16em] text-text-muted sm:px-10">
+            <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-between sm:gap-4">
+              <span>&copy; {new Date().getFullYear()} {copy.brand.name}. {copy.brand.rights}</span>
+              <span>{copy.brand.developedBy}</span>
+            </div>
+          </footer>
         </div>
       </body>
     </html>

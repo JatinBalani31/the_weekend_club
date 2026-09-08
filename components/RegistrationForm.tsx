@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { Loader2, ShieldCheck } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input, { fieldStyles, fieldLabelStyles, fieldErrorStyles } from "@/components/ui/Input";
@@ -40,6 +41,7 @@ type PendingPayment = {
 export default function RegistrationForm({ eventSlug, tiers = [], user }: { eventSlug: string; tiers?: { id: string; name: string; price: number }[]; user?: PrefillUser }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const {
@@ -54,6 +56,7 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
    * returns the existing registration rather than creating a second one.
    */
   async function confirmPayment(payment: RazorpayPaymentResponse) {
+    setIsConfirming(true);
     const verification = await fetch("/api/verify-payment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -67,8 +70,7 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
       return true;
     }
 
-    // The money left their account, so keep the reference on screen and offer a
-    // way forward rather than just showing an error.
+    setIsConfirming(false);
     setSubmitError(result.error ?? copy.registration.paymentVerifyError);
     setPendingPayment({
       payment,
@@ -84,8 +86,8 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
     if (!pendingPayment) return;
     setIsRetrying(true);
     setSubmitError(null);
-    await confirmPayment(pendingPayment.payment);
-    setIsRetrying(false);
+    const ok = await confirmPayment(pendingPayment.payment);
+    if (!ok) setIsRetrying(false);
   }
 
   async function onSubmit(values: FormValues) {
@@ -163,32 +165,54 @@ export default function RegistrationForm({ eventSlug, tiers = [], user }: { even
 
   return (
     <Card>
+      {isConfirming && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg/95 backdrop-blur-sm">
+          <ShieldCheck size={48} className="text-accent" />
+          <Loader2 size={28} className="mt-4 animate-spin text-accent" />
+          <p className="mt-6 font-display text-xl font-bold uppercase tracking-wider text-text sm:text-2xl">
+            {copy.registration.confirmingOverlayTitle}
+          </p>
+          <p className="mt-3 max-w-xs text-center font-body text-sm leading-relaxed text-text-muted">
+            {copy.registration.confirmingOverlayMessage}
+          </p>
+        </div>
+      )}
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-6">
-        <Input
-          label={copy.auth.name}
-          error={errors.name?.message}
-          autoComplete="name"
-          placeholder="Your full name"
-          {...register("name", { required: "Tell us your name." })}
-        />
-        <Input
-          label={copy.auth.email}
-          error={errors.email?.message}
-          autoComplete="email"
-          placeholder="you@example.com"
-          type="email"
-          {...register("email", { required: "Enter your email.", pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email." } })}
-        />
-        <Input
-          label={copy.auth.whatsappMobile}
-          hint={copy.auth.indianNumber}
-          error={errors.phone?.message}
-          autoComplete="tel"
-          inputMode="tel"
-          placeholder="98765 43210"
-          type="tel"
-          {...register("phone", { required: "Enter your phone number.", pattern: { value: /^(?:\+91[\s-]?)?[6-9]\d{9}$/, message: "Enter a valid Indian phone number." } })}
-        />
+        {user ? (
+          <>
+            <input type="hidden" {...register("name")} />
+            <input type="hidden" {...register("email")} />
+            <input type="hidden" {...register("phone")} />
+          </>
+        ) : (
+          <>
+            <Input
+              label={copy.auth.name}
+              error={errors.name?.message}
+              autoComplete="name"
+              placeholder="Your full name"
+              {...register("name", { required: "Tell us your name." })}
+            />
+            <Input
+              label={copy.auth.email}
+              error={errors.email?.message}
+              autoComplete="email"
+              placeholder="you@example.com"
+              type="email"
+              {...register("email", { required: "Enter your email.", pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: "Enter a valid email." } })}
+            />
+            <Input
+              label={copy.auth.whatsappMobile}
+              hint={copy.auth.indianNumber}
+              error={errors.phone?.message}
+              autoComplete="tel"
+              inputMode="tel"
+              placeholder="98765 43210"
+              type="tel"
+              {...register("phone", { required: "Enter your phone number.", pattern: { value: /^(?:\+91[\s-]?)?[6-9]\d{9}$/, message: "Enter a valid Indian phone number." } })}
+            />
+          </>
+        )}
         <Input
           label={copy.registration.stravaHandle}
           hint={copy.common.optional}

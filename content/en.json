@@ -2,7 +2,9 @@
   "brand": {
     "name": "the Weekend Club",
     "description": "The Weekend Club running community.",
-    "footerLine": "See you outside."
+    "footerLine": "See you outside.",
+    "rights": "All rights reserved.",
+    "developedBy": "Developed by Jatin Balani"
   },
   "navigation": {
     "home": "Home",
@@ -130,7 +132,15 @@
     "currentPassword": "Current password",
     "currentPasswordRequired": "Enter your current password to change it.",
     "saving": "Saving...",
-    "saveChanges": "Save changes"
+    "saveChanges": "Save changes",
+    "or": "or",
+    "googleSignInError": "Google sign-in failed. Please try again or use your email and password.",
+    "almostThere": "Almost there",
+    "completeSignup": "Complete signup",
+    "completeSignupDescription": "Just one more detail. We need your mobile number for event coordination.",
+    "signedInAs": "Signed in as",
+    "registeringAs": "Registering as",
+    "loginToRegister": "Log in or sign up to register for this event."
   },
   "registration": {
     "label": "Registration",
@@ -140,6 +150,8 @@
     "chooseTierRequired": "Choose a ticket tier.",
     "sendUpdates": "Send me occasional updates about future runs and events",
     "confirming": "Confirming your spot...",
+    "confirmingOverlayTitle": "Confirming your spot",
+    "confirmingOverlayMessage": "Please do not close, refresh, or press back. This will only take a moment.",
     "complete": "Complete registration",
     "eventRegistration": "Event registration",
     "paymentStartError": "Could not start payment.",
@@ -170,7 +182,7 @@
     "onList": "You are on the list.",
     "savedDetails": "Your registration details are saved. We will share the next steps with you soon.",
     "keepMoving": "Keep moving with us",
-    "addToCalendar": "Add to calendar"
+    "addToCalendar": "Add to Google Calendar"
   },
   "admin": {
     "title": "Admin",

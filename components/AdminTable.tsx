@@ -48,7 +48,7 @@ export default function AdminTable({ registrations }: { registrations: AdminRegi
       </div>
       <div className="mt-5 overflow-x-auto">
         <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
-          <thead><tr className="border-b border-border text-xs uppercase tracking-wider text-text-muted">{[copy.admin.table.registrationNo, "Name", "Email", "Phone", "Event", "Tier", "Amount", "Status", "Updates", "Registered"].map((heading) => <th key={heading} className="px-3 py-3 font-bold">{heading}</th>)}</tr></thead>
+          <thead><tr className="border-b border-border text-xs uppercase tracking-wider text-text-muted">{[copy.admin.table.registrationNo, "Name", "Email", "Phone", "Strava", "Event", "Tier", "Amount", "Status", "Updates", "Registered"].map((heading) => <th key={heading} className="px-3 py-3 font-bold">{heading}</th>)}</tr></thead>
           <tbody>
             {filtered.map((item) => (
               <tr key={item.id} className="border-b border-border">
@@ -56,6 +56,7 @@ export default function AdminTable({ registrations }: { registrations: AdminRegi
                 <td className="px-3 py-4 font-bold">{item.name}</td>
                 <td className="px-3 py-4">{item.email}</td>
                 <td className="px-3 py-4">{item.phone}</td>
+                <td className="px-3 py-4">{item.strava_handle || "—"}</td>
                 <td className="px-3 py-4">{item.event?.title ?? "Unknown event"}</td>
                 <td className="px-3 py-4">{item.ticket_tier?.name ?? "—"}</td>
                 <td className="px-3 py-4">{item.charged_price != null ? `INR ${item.charged_price}` : "—"}</td>
