@@ -1,0 +1,17 @@
+name: Pre-event participant notification
+
+on:
+  schedule:
+    # Every 15 minutes. Vercel's Hobby plan only allows daily crons, so this
+    # runs on GitHub Actions instead and hits the same endpoint.
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call pre-event-notify endpoint
+        run: |
+          curl -sf -X GET "${{ secrets.SITE_URL }}/api/cron/pre-event-notify" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
