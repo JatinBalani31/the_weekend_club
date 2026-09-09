@@ -5,7 +5,8 @@ import { hasColumn } from "@/lib/schemaProbe";
 import { hasRegistrationCodeColumn } from "@/lib/registrations";
 import {
   devCreateUser,
-  devFindOrCreateGoogleUser,
+  devCreateGoogleUser,
+  devFindGoogleUser,
   devFindTierName,
   devFindUserByEmailOrPhone,
   devGetEventById,
@@ -22,7 +23,8 @@ export type PublicUser = {
   phone: string;
 };
 
-export type UserWithPasswordHash = PublicUser & { password_hash: string };
+/** Null for Google-only accounts, which have no password to verify against. */
+export type UserWithPasswordHash = PublicUser & { password_hash: string | null };
 
 export type UserRegistration = {
   id: string;
@@ -34,58 +36,60 @@ export type UserRegistration = {
   ticket_tier: { name: string } | null;
 };
 
-export async function findOrCreateGoogleUser(input: { googleId: string; email: string; name: string }): Promise<{ user?: PublicUser; needsPhone?: boolean }> {
+/**
+ * Resolves a Google profile to an existing account, linking the Google id to a
+ * matching email the first time someone who signed up with a password uses
+ * Google instead. Returns null when there is no account yet - the caller then
+ * collects a phone number and calls `createGoogleUser`, so a half-finished
+ * signup never leaves a row behind.
+ */
+export async function findGoogleUser(input: { googleId: string; email: string }): Promise<PublicUser | null> {
   if (isDevStoreEnabled()) {
-    const result = devFindOrCreateGoogleUser(input);
-    if (!result.user) return {};
-    return { user: { id: result.user.id, name: result.user.name, email: result.user.email, phone: result.user.phone }, needsPhone: result.needsPhone };
+    const user = devFindGoogleUser(input);
+    return user ? { id: user.id, name: user.name, email: user.email, phone: user.phone } : null;
   }
 
   const supabase = getSupabaseAdminClient();
-  if (!supabase) return {};
+  if (!supabase) return null;
 
   const { data: byGoogle } = await supabase.from("users").select("id, name, email, phone").eq("google_id", input.googleId).maybeSingle();
-  if (byGoogle) return { user: byGoogle };
+  if (byGoogle) return byGoogle as PublicUser;
 
   const { data: byEmail } = await supabase.from("users").select("id, name, email, phone, google_id").eq("email", input.email).maybeSingle();
-  if (byEmail) {
-    if (!byEmail.google_id) {
-      await supabase.from("users").update({ google_id: input.googleId }).eq("id", byEmail.id);
-    }
-    return { user: { id: byEmail.id, name: byEmail.name, email: byEmail.email, phone: byEmail.phone } };
+  if (!byEmail) return null;
+
+  if (!byEmail.google_id) {
+    await supabase.from("users").update({ google_id: input.googleId }).eq("id", byEmail.id);
   }
-
-  const { data, error } = await supabase
-    .from("users")
-    .insert({ name: input.name, email: input.email, phone: "", google_id: input.googleId })
-    .select("id, name, email, phone")
-    .single();
-
-  if (error || !data) return {};
-  return { user: data, needsPhone: true };
+  return { id: byEmail.id, name: byEmail.name, email: byEmail.email, phone: byEmail.phone };
 }
 
-export async function completeGoogleSignup(userId: string, phone: string): Promise<{ user?: PublicUser; error?: string }> {
+export async function createGoogleUser(input: { googleId: string; email: string; name: string; phone: string }): Promise<{ user?: PublicUser; error?: string }> {
   if (isDevStoreEnabled()) {
-    const { user, error } = devUpdateUser(userId, { phone });
-    if (error || !user) return { error: error ?? "Could not save your details." };
+    const { user, error } = devCreateGoogleUser(input);
+    if (error || !user) return { error: error ?? "Could not create your account." };
     return { user: { id: user.id, name: user.name, email: user.email, phone: user.phone } };
   }
 
   const supabase = getSupabaseAdminClient();
   if (!supabase) return { error: "Accounts are not configured yet." };
 
-  const { data: existing } = await supabase.from("users").select("id").eq("phone", phone).neq("id", userId).maybeSingle();
-  if (existing) return { error: "An account with this phone number already exists." };
+  const { data: existingEmail } = await supabase.from("users").select("id").eq("email", input.email).maybeSingle();
+  if (existingEmail) return { error: "An account with this email already exists." };
+
+  const { data: existingPhone } = await supabase.from("users").select("id").eq("phone", input.phone).maybeSingle();
+  if (existingPhone) return { error: "An account with this phone number already exists." };
 
   const { data, error } = await supabase
     .from("users")
-    .update({ phone })
-    .eq("id", userId)
+    .insert({ name: input.name, email: input.email, phone: input.phone, google_id: input.googleId })
     .select("id, name, email, phone")
     .single();
 
-  if (error || !data) return { error: "Could not save your details." };
+  if (error || !data) {
+    console.error("Unable to create Google user", error);
+    return { error: "Could not create your account." };
+  }
   return { user: data };
 }
 

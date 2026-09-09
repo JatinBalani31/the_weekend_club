@@ -5,6 +5,14 @@ export async function GET(request: Request) {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) return NextResponse.json({ error: "Google sign-in is not configured." }, { status: 503 });
 
+  // Google matches the redirect_uri against the registered one exactly. Falling
+  // back to localhost in production would send people to a dead address and
+  // surface as an opaque redirect_uri_mismatch, so say what is actually wrong.
+  if (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_SITE_URL) {
+    console.error("NEXT_PUBLIC_SITE_URL is unset; Google OAuth cannot build a valid redirect URI.");
+    return NextResponse.json({ error: "Google sign-in is not configured." }, { status: 503 });
+  }
+
   const { searchParams } = new URL(request.url);
   const redirect = searchParams.get("redirect") ?? "/account";
 

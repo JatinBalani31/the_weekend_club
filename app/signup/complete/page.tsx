@@ -1,23 +1,19 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import CompleteGoogleSignup from "@/components/CompleteGoogleSignup";
+import { getPendingSignupCookieName, parsePendingSignupToken } from "@/lib/userAuth";
 import copy from "@/content/en.json";
 
+export const dynamic = "force-dynamic";
 export const metadata = {
-  title: `Complete signup | ${copy.brand.name}`,
+  title: `${copy.auth.completeSignup} | ${copy.brand.name}`,
 };
 
-export default function CompleteSignupPage({ searchParams }: { searchParams: { userId?: string; name?: string; email?: string; redirect?: string } }) {
-  const { userId, name, email, redirect } = searchParams;
-  if (!userId || !email) {
-    return (
-      <main className="min-h-screen bg-bg px-5 py-6 sm:px-10 sm:py-10">
-        <div className="mx-auto max-w-xl">
-          <p className="mt-20 text-text-muted">Invalid signup link. <Link href="/signup" className="font-bold text-text underline decoration-accent decoration-2 underline-offset-4">Start over</Link></p>
-        </div>
-      </main>
-    );
-  }
+export default function CompleteSignupPage({ searchParams }: { searchParams: { redirect?: string } }) {
+  const profile = parsePendingSignupToken(cookies().get(getPendingSignupCookieName())?.value);
+  if (!profile) redirect("/login?error=signup_expired");
 
   return (
     <main className="min-h-screen bg-bg px-5 py-6 sm:px-10 sm:py-10">
@@ -28,7 +24,7 @@ export default function CompleteSignupPage({ searchParams }: { searchParams: { u
           <h1 className="mt-4 font-display text-5xl uppercase leading-[0.9] tracking-[0.01em] sm:text-7xl">{copy.auth.completeSignup}</h1>
           <p className="mt-6 text-lg leading-relaxed text-text-muted">{copy.auth.completeSignupDescription}</p>
         </header>
-        <CompleteGoogleSignup userId={userId} name={name ?? ""} email={email} redirect={redirect ?? "/account"} />
+        <CompleteGoogleSignup name={profile.name} email={profile.email} redirect={searchParams.redirect ?? "/account"} />
       </div>
     </main>
   );

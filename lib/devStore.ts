@@ -242,17 +242,22 @@ export function devUpdateUser(
   return { user };
 }
 
-export function devFindOrCreateGoogleUser(input: { googleId: string; email: string; name: string }) {
+export function devFindGoogleUser(input: { googleId: string; email: string }) {
   const db = readDb();
   const byGoogle = db.users.find((user) => user.google_id === input.googleId);
-  if (byGoogle) return { user: byGoogle };
+  if (byGoogle) return byGoogle;
   const byEmail = db.users.find((user) => user.email === input.email);
-  if (byEmail) {
-    if (!byEmail.google_id) { byEmail.google_id = input.googleId; writeDb(db); }
-    return { user: byEmail };
-  }
-  const user: DevUser = { id: crypto.randomUUID(), name: input.name, email: input.email, phone: "", password_hash: "", google_id: input.googleId, created_at: new Date().toISOString() };
+  if (!byEmail) return null;
+  if (!byEmail.google_id) { byEmail.google_id = input.googleId; writeDb(db); }
+  return byEmail;
+}
+
+export function devCreateGoogleUser(input: { googleId: string; email: string; name: string; phone: string }) {
+  const db = readDb();
+  if (db.users.some((user) => user.email === input.email)) return { error: "An account with this email already exists." };
+  if (db.users.some((user) => user.phone === input.phone)) return { error: "An account with this phone number already exists." };
+  const user: DevUser = { id: crypto.randomUUID(), name: input.name, email: input.email, phone: input.phone, password_hash: "", google_id: input.googleId, created_at: new Date().toISOString() };
   db.users.push(user);
   writeDb(db);
-  return { user, needsPhone: true };
+  return { user };
 }

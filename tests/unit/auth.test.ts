@@ -1,9 +1,12 @@
 import { describe, expect, it, beforeAll } from "vitest";
 import {
+  createPendingSignupToken,
   createUserSessionToken,
   hashPassword,
+  parsePendingSignupToken,
   parseUserSessionToken,
   verifyPassword,
+  PENDING_SIGNUP_MAX_AGE_MS,
   SESSION_MAX_AGE_MS,
 } from "@/lib/userAuth";
 
@@ -37,6 +40,61 @@ describe("password hashing", () => {
     for (const malformed of ["", "nosalt", "::", "abc:"]) {
       expect(await verifyPassword("x", malformed)).toBe(false);
     }
+  });
+
+  it("rejects a Google-only account with no password instead of throwing", async () => {
+    // These accounts have password_hash null; password login must fail closed.
+    expect(await verifyPassword("anything", null)).toBe(false);
+    expect(await verifyPassword("anything", undefined)).toBe(false);
+  });
+});
+
+describe("pending Google signup tokens", () => {
+  const profile = { googleId: "108900112233445566778", email: "runner@example.com", name: "Runner" };
+
+  it("round-trips a freshly issued token", () => {
+    expect(parsePendingSignupToken(createPendingSignupToken(profile)!)).toEqual(profile);
+  });
+
+  it("rejects a swapped-in email, so nobody can claim another address", () => {
+    const token = createPendingSignupToken(profile)!;
+    const [, issuedAt, signature] = token.split(".");
+    const forgedBody = Buffer.from(
+      JSON.stringify({ ...profile, email: "victim@example.com" }),
+    ).toString("base64url");
+    expect(parsePendingSignupToken(`${forgedBody}.${issuedAt}.${signature}`)).toBeNull();
+  });
+
+  it("rejects a forged signature", () => {
+    const token = createPendingSignupToken(profile)!;
+    const [body, issuedAt] = token.split(".");
+    expect(parsePendingSignupToken(`${body}.${issuedAt}.${"a".repeat(64)}`)).toBeNull();
+  });
+
+  it("expires a token older than the maximum age", () => {
+    const crypto = require("node:crypto");
+    const expiredIssuedAt = Date.now() - PENDING_SIGNUP_MAX_AGE_MS - 1000;
+    const body = Buffer.from(JSON.stringify(profile)).toString("base64url");
+    const signature = crypto
+      .createHmac("sha256", process.env.SESSION_SECRET!)
+      .update(`${body}:${expiredIssuedAt}`)
+      .digest("hex");
+    expect(parsePendingSignupToken(`${body}.${expiredIssuedAt}.${signature}`)).toBeNull();
+  });
+
+  it("rejects malformed, empty, and incomplete payloads", () => {
+    for (const bad of [undefined, "", "a", "a.b", "a.b.c.d"]) {
+      expect(parsePendingSignupToken(bad as string | undefined)).toBeNull();
+    }
+    // Correctly signed but missing the fields the account is built from.
+    const crypto = require("node:crypto");
+    const issuedAt = Date.now();
+    const body = Buffer.from(JSON.stringify({ email: "runner@example.com" })).toString("base64url");
+    const signature = crypto
+      .createHmac("sha256", process.env.SESSION_SECRET!)
+      .update(`${body}:${issuedAt}`)
+      .digest("hex");
+    expect(parsePendingSignupToken(`${body}.${issuedAt}.${signature}`)).toBeNull();
   });
 });
 

@@ -26,8 +26,13 @@ export async function hashPassword(password: string) {
   return `${salt}:${hash}`;
 }
 
-export async function verifyPassword(password: string, storedHash: string) {
-  const [salt, hash] = storedHash.split(":");
+/**
+ * `storedHash` is nullable because Google-only accounts have no password. Such
+ * an account must fail password login rather than throw, so the hash is checked
+ * before it is split.
+ */
+export async function verifyPassword(password: string, storedHash: string | null | undefined) {
+  const [salt, hash] = (storedHash ?? "").split(":");
   if (!salt || !hash) return false;
   const candidate = (await scrypt(password, salt, SCRYPT_KEY_LENGTH)).toString("hex");
   return timingSafeStringEqual(hash, candidate);
@@ -56,6 +61,57 @@ export function createUserSessionToken(userId: string) {
   const issuedAt = Date.now();
   const signature = crypto.createHmac("sha256", secret).update(`${userId}:${issuedAt}`).digest("hex");
   return `${userId}.${issuedAt}.${signature}`;
+}
+
+const PENDING_SIGNUP_COOKIE = "google_pending_signup";
+/** A half-finished Google signup is short-lived: finish it now or start over. */
+export const PENDING_SIGNUP_MAX_AGE_MS = 15 * 60 * 1000;
+
+export type PendingGoogleSignup = { googleId: string; email: string; name: string };
+
+export function getPendingSignupCookieName() {
+  return PENDING_SIGNUP_COOKIE;
+}
+
+/**
+ * Carries a verified Google profile between the OAuth callback and the phone
+ * step. It is signed because the browser holds it: the profile decides which
+ * account gets created, so an attacker who could edit it could claim any
+ * email. Nothing is written to the database until the phone number arrives,
+ * which is also what keeps `users.phone` (not null, unique) collision-free.
+ */
+export function createPendingSignupToken(profile: PendingGoogleSignup) {
+  const secret = getSessionSecret();
+  if (!secret) return null;
+  const issuedAt = Date.now();
+  const body = Buffer.from(JSON.stringify(profile)).toString("base64url");
+  const signature = crypto.createHmac("sha256", secret).update(`${body}:${issuedAt}`).digest("hex");
+  return `${body}.${issuedAt}.${signature}`;
+}
+
+export function parsePendingSignupToken(token: string | undefined): PendingGoogleSignup | null {
+  const secret = getSessionSecret();
+  if (!secret || !token) return null;
+
+  const [body, issuedAtRaw, signature] = token.split(".");
+  if (!body || !issuedAtRaw || !signature) return null;
+
+  const issuedAt = Number(issuedAtRaw);
+  if (!Number.isFinite(issuedAt)) return null;
+
+  const expected = crypto.createHmac("sha256", secret).update(`${body}:${issuedAt}`).digest("hex");
+  if (!timingSafeStringEqual(expected, signature)) return null;
+
+  const age = Date.now() - issuedAt;
+  if (age > PENDING_SIGNUP_MAX_AGE_MS || age < -60_000) return null;
+
+  try {
+    const parsed = JSON.parse(Buffer.from(body, "base64url").toString()) as PendingGoogleSignup;
+    if (!parsed.googleId || !parsed.email || !parsed.name) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 export type ParsedSession = { userId: string; issuedAt: Date };

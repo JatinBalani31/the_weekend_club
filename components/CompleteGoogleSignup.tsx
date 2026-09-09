@@ -10,7 +10,7 @@ import copy from "@/content/en.json";
 
 type FormValues = { phone: string };
 
-export default function CompleteGoogleSignup({ userId, name, email, redirect }: { userId: string; name: string; email: string; redirect: string }) {
+export default function CompleteGoogleSignup({ name, email, redirect }: { name: string; email: string; redirect: string }) {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({ mode: "onBlur" });
@@ -20,7 +20,7 @@ export default function CompleteGoogleSignup({ userId, name, email, redirect }: 
     const response = await fetch("/api/auth/google/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, phone: values.phone }),
+      body: JSON.stringify({ phone: values.phone }),
     });
     const result = await response.json();
     if (!response.ok) { setSubmitError(result.error ?? copy.auth.loginError); return; }

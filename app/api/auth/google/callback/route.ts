@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { findOrCreateGoogleUser } from "@/lib/users";
-import { createUserSessionToken, getUserCookieName } from "@/lib/userAuth";
+import { findGoogleUser } from "@/lib/users";
+import {
+  PENDING_SIGNUP_MAX_AGE_MS,
+  createPendingSignupToken,
+  createUserSessionToken,
+  getPendingSignupCookieName,
+  getUserCookieName,
+} from "@/lib/userAuth";
 
 type GoogleTokenResponse = { access_token?: string; id_token?: string };
 type GoogleUserInfo = { sub?: string; email?: string; name?: string; picture?: string };
@@ -69,27 +75,32 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login?error=missing_profile", siteUrl()));
   }
 
-  const { user, needsPhone } = await findOrCreateGoogleUser({
+  const profile = {
     googleId: googleUser.sub,
     email: googleUser.email,
     name: googleUser.name ?? googleUser.email.split("@")[0],
-  });
+  };
 
-  if (needsPhone && user) {
-    const params = new URLSearchParams({
-      google: "1",
-      userId: user.id,
-      name: user.name,
-      email: user.email,
-      redirect: statePayload.redirect,
-    });
+  const user = await findGoogleUser(profile);
+
+  // No account yet. Nothing is written until they supply a phone number, and
+  // the profile rides in a signed cookie rather than the URL so it cannot be
+  // edited into a claim on somebody else's email.
+  if (!user) {
+    const pending = createPendingSignupToken(profile);
+    if (!pending) return NextResponse.redirect(new URL("/login?error=session_failed", siteUrl()));
+
+    const params = new URLSearchParams({ redirect: statePayload.redirect });
     const response = NextResponse.redirect(new URL(`/signup/complete?${params}`, siteUrl()));
+    response.cookies.set(getPendingSignupCookieName(), pending, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: Math.floor(PENDING_SIGNUP_MAX_AGE_MS / 1000),
+    });
     response.cookies.delete("google_oauth_state");
     return response;
-  }
-
-  if (!user) {
-    return NextResponse.redirect(new URL("/login?error=account_failed", siteUrl()));
   }
 
   const token = createUserSessionToken(user.id);
