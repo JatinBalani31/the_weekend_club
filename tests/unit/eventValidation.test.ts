@@ -43,10 +43,17 @@ describe("event run-detail validation", () => {
     expect(parseEventInput({ ...validEvent, route_description: "x".repeat(5001) }).error).toBe("Run details must be 5,000 characters or fewer.");
   });
 
-  it("accepts an HTTPS route image and rejects other URL schemes", () => {
-    expect(parseEventInput({ ...validEvent, route_image_url: "https://project.supabase.co/storage/route.png" }).input?.route_image_url)
-      .toBe("https://project.supabase.co/storage/route.png");
+  it("accepts uploaded route-image paths and signed storage URLs", () => {
+    const path = "runs/123e4567-e89b-12d3-a456-426614174000.png";
+    const signedUrl = `https://project.supabase.co/storage/v1/object/sign/route-images/${path}?token=example`;
+    expect(parseEventInput({ ...validEvent, route_image_url: path }).input?.route_image_url).toBe(path);
+    expect(parseEventInput({ ...validEvent, route_image_url: signedUrl }).input?.route_image_url).toBe(signedUrl);
+  });
+
+  it("rejects invalid route-image references", () => {
     expect(parseEventInput({ ...validEvent, route_image_url: "data:image/png;base64,abc" }).error).toBe("Upload a valid route image.");
+    expect(parseEventInput({ ...validEvent, route_image_url: "https://project.supabase.co/storage/route.png" }).error).toBe("Upload a valid route image.");
+    expect(parseEventInput({ ...validEvent, route_image_url: "runs/not-a-uuid.png" }).error).toBe("Upload a valid route image.");
   });
 });
 

@@ -1,6 +1,19 @@
 import type { EventInput, EventType } from "@/lib/events";
 
 const EVENT_TYPES: EventType[] = ["run", "workshop", "music"];
+const ROUTE_IMAGE_PATH = /^runs\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/i;
+
+function isValidRouteImageReference(value: string) {
+  if (ROUTE_IMAGE_PATH.test(value)) return true;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:"
+      && /^\/storage\/v1\/object\/(?:public|sign)\/route-images\/runs\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
 
 export function parseEventInput(payload: unknown): { input?: EventInput; error?: string } {
   if (typeof payload !== "object" || payload === null) return { error: "Invalid request body." };
@@ -25,7 +38,7 @@ export function parseEventInput(payload: unknown): { input?: EventInput; error?:
   if (!title || !description || !banner_image_url || !location) return { error: "Fill in every event field." };
   if (route_description.length > 5000) return { error: "Run details must be 5,000 characters or fewer." };
   if (rawRouteUrl.length > 2048) return { error: "Route URL must be 2,048 characters or fewer." };
-  if (route_image_url && (route_image_url.length > 2048 || !/^https:\/\//i.test(route_image_url))) return { error: "Upload a valid route image." };
+  if (route_image_url && (route_image_url.length > 2048 || !isValidRouteImageReference(route_image_url))) return { error: "Upload a valid route image." };
   const route_url: string | null = rawRouteUrl || null;
   if (route_url) {
     try {
