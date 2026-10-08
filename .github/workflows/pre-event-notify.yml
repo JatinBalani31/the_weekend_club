@@ -1,4 +1,4 @@
-name: Pre-event participant notification
+name: Scheduled event notifications
 
 on:
   schedule:
@@ -11,7 +11,7 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Call pre-event-notify endpoint
+      - name: Call scheduled event notification endpoint
         run: |
           curl -sf -X GET "${{ secrets.SITE_URL }}/api/cron/pre-event-notify" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

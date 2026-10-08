@@ -24,6 +24,9 @@ export type Event = {
   capacity: number;
   event_type: EventType;
   is_active: boolean;
+  route_description?: string | null;
+  route_url?: string | null;
+  route_image_url?: string | null;
   created_at: string;
   ticket_tiers?: TicketTier[];
 };
@@ -55,20 +58,31 @@ export type EventInput = {
   capacity: number;
   event_type: EventType;
   is_active: boolean;
+  route_description: string | null;
+  route_url: string | null;
+  route_image_url: string | null;
   ticket_tiers: TicketTierInput[];
 };
 
-const EVENT_FIELDS = "id, title, slug, description, banner_image_url, date, location, price, capacity, event_type, is_active, created_at, ticket_tiers(id, name, price, capacity, sale_ends_at, is_active)";
+const BASE_EVENT_FIELDS = "id, title, slug, description, banner_image_url, date, location, price, capacity, event_type, is_active, created_at, ticket_tiers(id, name, price, capacity, sale_ends_at, is_active)";
+
+function withoutRunDetails(event: Event): Event {
+  const publicEvent = { ...event };
+  delete publicEvent.route_description;
+  delete publicEvent.route_url;
+  delete publicEvent.route_image_url;
+  return publicEvent;
+}
 
 export async function getUpcomingEvents(limit?: number): Promise<Event[]> {
-  if (isDevStoreEnabled()) return devGetUpcomingEvents(limit);
+  if (isDevStoreEnabled()) return devGetUpcomingEvents(limit).map(withoutRunDetails);
 
   const supabase = getSupabaseClient();
   if (!supabase) return [];
 
   let query = supabase
     .from("events")
-    .select(EVENT_FIELDS)
+    .select(BASE_EVENT_FIELDS)
     .eq("is_active", true)
     .gt("date", new Date().toISOString())
     .order("date", { ascending: true });
@@ -81,18 +95,21 @@ export async function getUpcomingEvents(limit?: number): Promise<Event[]> {
     return [];
   }
 
-  return (data ?? []) as Event[];
+  return (data ?? []) as unknown as Event[];
 }
 
 export async function getUpcomingEventBySlug(slug: string): Promise<Event | null> {
-  if (isDevStoreEnabled()) return devGetUpcomingEventBySlug(slug);
+  if (isDevStoreEnabled()) {
+    const event = devGetUpcomingEventBySlug(slug);
+    return event ? withoutRunDetails(event) : null;
+  }
 
   const supabase = getSupabaseClient();
   if (!supabase) return null;
 
   const { data, error } = await supabase
     .from("events")
-    .select(EVENT_FIELDS)
+    .select(BASE_EVENT_FIELDS)
     .eq("slug", slug)
     .eq("is_active", true)
     .gt("date", new Date().toISOString())
@@ -103,7 +120,7 @@ export async function getUpcomingEventBySlug(slug: string): Promise<Event | null
     return null;
   }
 
-  return data as Event | null;
+  return data as unknown as Event | null;
 }
 
 export async function getAllEventsAdmin(): Promise<Event[]> {
@@ -114,7 +131,7 @@ export async function getAllEventsAdmin(): Promise<Event[]> {
 
   const { data, error } = await supabase
     .from("events")
-    .select(EVENT_FIELDS)
+    .select(BASE_EVENT_FIELDS)
     .order("date", { ascending: false });
 
   if (error) {
@@ -122,7 +139,29 @@ export async function getAllEventsAdmin(): Promise<Event[]> {
     return [];
   }
 
-  return (data ?? []) as Event[];
+  const events = (data ?? []) as unknown as Event[];
+  if (events.length === 0) return events;
+
+  const { data: routeDetails, error: routeDetailsError } = await supabase
+    .from("event_run_details")
+    .select("event_id, route_description, route_url, route_image_path")
+    .in("event_id", events.map((event) => event.id));
+
+  if (routeDetailsError) {
+    console.error("Unable to load run details for admin", routeDetailsError);
+    return events;
+  }
+
+  const detailsByEventId = new Map((routeDetails ?? []).map((details) => [details.event_id, details]));
+  return events.map((event) => {
+    const details = detailsByEventId.get(event.id);
+    return {
+      ...event,
+      route_description: details?.route_description ?? null,
+      route_url: details?.route_url ?? null,
+      route_image_url: details?.route_image_path ?? null,
+    };
+  });
 }
 
 export function slugify(title: string) {
@@ -213,6 +252,23 @@ export async function updateEventWithTiers(id: string, input: EventInput): Promi
   if (error) {
     console.error("Unable to update event", error);
     return { error: "Could not update the event." };
+  }
+
+  const runDetails = {
+    event_id: id,
+    route_description: input.route_description,
+    route_url: input.route_url,
+    route_image_path: input.route_image_url,
+    updated_at: new Date().toISOString(),
+  };
+  const hasRunDetails = runDetails.route_description || runDetails.route_url || runDetails.route_image_path;
+  const { error: runDetailsError } = hasRunDetails
+    ? await supabase.from("event_run_details").upsert(runDetails)
+    : await supabase.from("event_run_details").delete().eq("event_id", id);
+
+  if (runDetailsError) {
+    console.error("Unable to save event run details", runDetailsError);
+    return { error: "Event details were saved, but run details could not be updated. Check that the run-details migrations are applied." };
   }
 
   const { error: deleteError } = await supabase.from("ticket_tiers").delete().eq("event_id", id);

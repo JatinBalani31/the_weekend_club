@@ -1,34 +1,26 @@
 import crypto from "node:crypto";
 
-/**
- * Crockford-style alphabet: no 0/O/1/I so a code read off a phone screen and
- * typed in by hand at the check-in desk cannot be transcribed wrongly.
- */
-const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const CODE_LENGTH = 6;
 export const REGISTRATION_CODE_PREFIX = "TWC";
+const REGISTRATION_NUMBER_MIN = 0;
+const REGISTRATION_NUMBER_COUNT = 1000;
 
-/** Generates a random fallback code, e.g. "TWC-K4M2P9". */
+/** Generates a random attendee-facing code, e.g. "TWC-0428". */
 export function generateRegistrationCode() {
-  const bytes = crypto.randomBytes(CODE_LENGTH);
-  let code = "";
-  for (let index = 0; index < CODE_LENGTH; index += 1) code += ALPHABET[bytes[index] % ALPHABET.length];
-  return `${REGISTRATION_CODE_PREFIX}-${code}`;
+  return `${REGISTRATION_CODE_PREFIX}-${String(REGISTRATION_NUMBER_MIN + crypto.randomInt(REGISTRATION_NUMBER_COUNT)).padStart(4, "0")}`;
 }
 
-/** Sequential code from a number, e.g. 1 -> "TWC-001", 42 -> "TWC-042". */
-export function sequentialCode(seq: number) {
-  return `${REGISTRATION_CODE_PREFIX}-${String(seq).padStart(3, "0")}`;
+/** Selects an unused code, returning null after all 1,000 values are allocated. */
+export function generateAvailableRegistrationCode(usedCodes: ReadonlySet<string>) {
+  const available: string[] = [];
+  for (let number = REGISTRATION_NUMBER_MIN; number < REGISTRATION_NUMBER_MIN + REGISTRATION_NUMBER_COUNT; number += 1) {
+    const code = `${REGISTRATION_CODE_PREFIX}-${String(number).padStart(4, "0")}`;
+    if (!usedCodes.has(code)) available.push(code);
+  }
+  return available.length > 0 ? available[crypto.randomInt(available.length)] : null;
 }
 
-/**
- * Fallback for rows created before registration codes existed, so every
- * registration can still show a stable number. Derived from the row id, so it
- * is the same every time it is rendered.
- */
+/** Stable fallback for rows created before registration codes existed. */
 export function registrationCodeFromId(id: string) {
   const digest = crypto.createHash("sha256").update(id).digest();
-  let code = "";
-  for (let index = 0; index < CODE_LENGTH; index += 1) code += ALPHABET[digest[index] % ALPHABET.length];
-  return `${REGISTRATION_CODE_PREFIX}-${code}`;
+  return `${REGISTRATION_CODE_PREFIX}-${String(REGISTRATION_NUMBER_MIN + (digest.readUInt32BE(0) % REGISTRATION_NUMBER_COUNT)).padStart(4, "0")}`;
 }

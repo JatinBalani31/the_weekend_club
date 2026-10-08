@@ -3,6 +3,7 @@ import { hashPassword, parseUserSessionToken } from "@/lib/userAuth";
 import { registrationCodeFromId } from "@/lib/registrationCode";
 import { hasColumn } from "@/lib/schemaProbe";
 import { hasRegistrationCodeColumn } from "@/lib/registrations";
+import { getSignedRouteImageUrl } from "@/lib/routeImages";
 import {
   devCreateUser,
   devCreateGoogleUser,
@@ -32,7 +33,15 @@ export type UserRegistration = {
   payment_status: "pending" | "paid" | "failed";
   charged_price: number | null;
   created_at: string;
-  event: { title: string; slug: string; date: string; location: string } | null;
+  event: {
+    title: string;
+    slug: string;
+    date: string;
+    location: string;
+    route_description?: string | null;
+    route_url?: string | null;
+    route_image_url?: string | null;
+  } | null;
   ticket_tier: { name: string } | null;
 };
 
@@ -266,7 +275,15 @@ export async function getUserRegistrations(userId: string): Promise<UserRegistra
         payment_status: registration.payment_status,
         charged_price: registration.charged_price,
         created_at: registration.created_at,
-        event: event ? { title: event.title, slug: event.slug, date: event.date, location: event.location } : null,
+        event: event ? {
+          title: event.title,
+          slug: event.slug,
+          date: event.date,
+          location: event.location,
+          route_description: event.route_description,
+          route_url: event.route_url,
+          route_image_url: event.route_image_url,
+        } : null,
         ticket_tier: tierName ? { name: tierName } : null,
       };
     });
@@ -274,11 +291,11 @@ export async function getUserRegistrations(userId: string): Promise<UserRegistra
 
   const supabase = getSupabaseAdminClient();
   if (!supabase) return [];
-  const hasColumn = await hasRegistrationCodeColumn(supabase);
+  const hasCodeColumn = await hasRegistrationCodeColumn(supabase);
 
   const { data, error } = await supabase
     .from("registrations")
-    .select(`${hasColumn ? "registration_code, " : ""}id, payment_status, charged_price, created_at, event:events(title, slug, date, location), ticket_tier:ticket_tiers(name)`)
+    .select(`${hasCodeColumn ? "registration_code, " : ""}id, event_id, payment_status, charged_price, created_at, event:events(title, slug, date, location), ticket_tier:ticket_tiers(name)`)
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -287,17 +304,47 @@ export async function getUserRegistrations(userId: string): Promise<UserRegistra
     return [];
   }
 
-  // The select list is built at runtime, so Supabase cannot infer the row shape.
-  type RawRow = Omit<UserRegistration, "registration_code" | "event" | "ticket_tier"> & {
+  const rows = (data ?? []) as unknown as Array<{
+    id: string;
+    event_id: string;
+    payment_status: UserRegistration["payment_status"];
+    charged_price: number | null;
+    created_at: string;
     registration_code?: string | null;
-    event?: unknown;
-    ticket_tier?: unknown;
-  };
+    event: unknown;
+    ticket_tier: unknown;
+  }>;
+  const paidEventIds = Array.from(new Set(rows.filter((row) => row.payment_status === "paid").map((row) => row.event_id)));
+  const detailsByEventId = new Map<string, { route_description: string | null; route_url: string | null; route_image_path: string | null }>();
 
-  return ((data ?? []) as unknown as RawRow[]).map((row) => ({
-    ...row,
-    registration_code: row.registration_code ?? registrationCodeFromId(row.id),
-    event: Array.isArray(row.event) ? row.event[0] ?? null : row.event,
-    ticket_tier: Array.isArray(row.ticket_tier) ? row.ticket_tier[0] ?? null : row.ticket_tier,
+  if (paidEventIds.length > 0) {
+    const { data: routeDetails, error: routeDetailsError } = await supabase
+      .from("event_run_details")
+      .select("event_id, route_description, route_url, route_image_path")
+      .in("event_id", paidEventIds);
+
+    if (routeDetailsError) {
+      console.error("Unable to load run details for your registrations", routeDetailsError);
+    } else {
+      for (const details of routeDetails ?? []) detailsByEventId.set(details.event_id, details);
+    }
+  }
+
+  // The select list is built at runtime, so Supabase cannot infer the row shape.
+  return await Promise.all(rows.map(async (row) => {
+    const rawEvent = Array.isArray(row.event) ? row.event[0] ?? null : row.event;
+    const event = rawEvent as Omit<NonNullable<UserRegistration["event"]>, "route_description" | "route_url" | "route_image_url"> | null;
+    const details = row.payment_status === "paid" ? detailsByEventId.get(row.event_id) : undefined;
+    return {
+      ...row,
+      registration_code: row.registration_code ?? registrationCodeFromId(row.id),
+      event: event ? {
+        ...event,
+        route_description: details?.route_description ?? null,
+        route_url: details?.route_url ?? null,
+        route_image_url: details?.route_image_path ? await getSignedRouteImageUrl(details.route_image_path) : null,
+      } : null,
+      ticket_tier: Array.isArray(row.ticket_tier) ? row.ticket_tier[0] ?? null : row.ticket_tier,
+    };
   })) as UserRegistration[];
 }

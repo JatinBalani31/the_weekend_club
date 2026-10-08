@@ -80,7 +80,7 @@ export default function CheckInScanner() {
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           onKeyDown={handleKeyDown}
-          placeholder="TWC-001"
+          placeholder="TWC-0428"
           autoFocus
           className="min-h-14 flex-1 border-2 border-border bg-surface px-4 font-mono text-lg uppercase tracking-widest focus:border-accent focus:outline-none"
         />

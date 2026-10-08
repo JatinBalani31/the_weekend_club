@@ -16,7 +16,7 @@ export default async function CheckInPage() {
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent">the Weekend Club</p>
         <h1 className="mt-3 font-display text-4xl uppercase tracking-[0.01em]">Check-in</h1>
         <p className="mt-2 font-body text-sm text-text-muted">
-          Enter a registration code (e.g. TWC-001) or scan the QR code on the attendee&apos;s pass.
+          Enter the registration code (e.g. TWC-0428) or scan the QR code on the attendee&apos;s pass.
         </p>
         <CheckInScanner />
       </div>

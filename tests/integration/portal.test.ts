@@ -80,7 +80,7 @@ describe("logged-in visitor journey", () => {
     // It must show up under the visitor's own account, with a code and QR.
     const account = await fetch(`${BASE_URL}/account`, { headers: { cookie } }).then((r) => r.text());
     expect(account).toContain(event.title);
-    expect(account).toMatch(/TWC-[A-Z2-9]{6}/);
+    expect(account).toMatch(/TWC-0\d{3}/);
     expect(account).toContain("data:image/png;base64");
   });
 

@@ -84,6 +84,24 @@ export default async function AccountPage() {
                     </span>
                   </div>
 
+                  {registration.payment_status === "paid" && registration.event && (registration.event.route_description || registration.event.route_url || registration.event.route_image_url) && (
+                    <section className="mt-5 border-t border-border pt-5">
+                      <h2 className="font-body text-xs font-bold uppercase tracking-[0.14em] text-accent">Participant-only run details</h2>
+                      {registration.event.route_description && (
+                        <p className="mt-3 whitespace-pre-line font-body text-sm leading-relaxed text-text">{registration.event.route_description}</p>
+                      )}
+                      {registration.event.route_url && (
+                        <a href={registration.event.route_url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-11 items-center font-body text-sm font-bold text-accent underline">
+                          Open route map
+                        </a>
+                      )}
+                      {registration.event.route_image_url && (
+                        // eslint-disable-next-line @next/next/no-img-element -- private route image is signed server-side for this registered attendee.
+                        <img src={registration.event.route_image_url} alt={`Route map for ${registration.event.title}`} className="mt-4 max-h-[36rem] w-full rounded-xl border border-border object-contain" />
+                      )}
+                    </section>
+                  )}
+
                   <details className="group mt-4 border-t border-border pt-4">
                     <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-body text-xs font-bold uppercase tracking-[0.14em] text-text-muted transition-colors hover:text-accent">
                       <span>

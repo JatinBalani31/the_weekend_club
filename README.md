@@ -228,7 +228,17 @@ Verify the sending domain in Resend and set `RESEND_FROM_EMAIL` to an address on
 
 ## Cron notifications
 
-`GET /api/cron/pre-event-notify` sends the admin a participant list shortly before an event. Vercel supplies the scheduled request; the route must be protected with `CRON_SECRET`. `events.notified_at` makes the notification idempotent.
+`GET /api/cron/pre-event-notify` sends the admin a participant list shortly before an event and emails saved run details to each paid registrant during the 24 hours before their event. The GitHub Actions schedule calls this endpoint every 15 minutes; configure `SITE_URL` and `CRON_SECRET` as repository secrets. `events.notified_at` and `registrations.run_details_email_sent_at` prevent routine duplicate notifications. Apply these Supabase migrations in timestamp order before deploying:
+
+1. `20261008110227_add_run_route_details.sql`
+2. `20261008112703_add_route_images_and_random_registration_codes.sql`
+3. `20261008142441_change_registration_codes_to_0xxx.sql`
+4. `20261008144403_secure_private_route_images.sql`
+5. `20261008144714_isolate_registered_run_details.sql` moves route data out of the publicly readable events table into a table with RLS enabled and no client access.
+
+Admins can add the optional route description, map URL, and JPG, PNG, or WebP screenshot (up to 5 MB) while editing a run, closer to its date; these are not part of event creation. Run details are shown only in the account of a paid registrant and sent by email during the 24 hours before the run. Route screenshots use a private `route-images` Supabase Storage bucket and expiring signed links. The editor can open a prefilled WhatsApp share message; an admin must select the group and send it manually.
+
+Attendee registration codes are randomly allocated as `TWC-0000` through `TWC-0999` and remain globally unique for check-in. This allows up to 1,000 registrations total; the migration randomizes existing codes and stops if more than 1,000 already exist.
 
 ## Deployment
 

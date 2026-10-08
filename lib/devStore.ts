@@ -91,6 +91,9 @@ function toEvent(input: EventInput, id: string, slug: string, createdAt: string)
     capacity: input.capacity,
     event_type: input.event_type,
     is_active: input.is_active,
+    route_description: input.route_description,
+    route_url: input.route_url,
+    route_image_url: input.route_image_url,
     created_at: createdAt,
     ticket_tiers: input.ticket_tiers.map((tier) => ({ ...tier, id: crypto.randomUUID() })),
   };

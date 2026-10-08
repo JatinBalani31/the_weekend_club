@@ -28,7 +28,7 @@ describe("free event registration", () => {
 
     // The success page must show a registration number and a QR pass.
     const page = await fetch(`${BASE_URL}/success?registration_id=${body.registrationId}`).then((r) => r.text());
-    expect(page).toMatch(/TWC-[A-Z2-9]{6}/);
+    expect(page).toMatch(/TWC-0\d{3}/);
     expect(page).toContain("data:image/png;base64");
   });
 

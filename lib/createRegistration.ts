@@ -1,6 +1,6 @@
 import { getUpcomingEventBySlug, type Event, type TicketTier } from "@/lib/events";
 import { getSupabaseAdminClient } from "@/lib/supabase";
-import { generateRegistrationCode, sequentialCode } from "@/lib/registrationCode";
+import { generateAvailableRegistrationCode, registrationCodeFromId } from "@/lib/registrationCode";
 import { hasRegistrationCodeColumn } from "@/lib/registrations";
 import { devCreateRegistration, devGetAllRegistrations, devSetRegistrationPaymentRefs, isDevStoreEnabled } from "@/lib/devStore";
 import type { RegistrationInput } from "@/lib/registrationInput";
@@ -119,8 +119,11 @@ export async function persistRegistration(params: {
   const { input, resolved, userId, razorpayOrderId = null, paymentId = null } = params;
 
   if (isDevStoreEnabled()) {
-    const existing = razorpayOrderId ? devGetAllRegistrations().find((item) => item.razorpay_order_id === razorpayOrderId) : null;
+    const registrations = devGetAllRegistrations();
+    const existing = razorpayOrderId ? registrations.find((item) => item.razorpay_order_id === razorpayOrderId) : null;
     if (existing) return { registrationId: existing.id, created: false };
+    const registrationCode = generateAvailableRegistrationCode(new Set(registrations.map((item) => item.registration_code ?? registrationCodeFromId(item.id))));
+    if (!registrationCode) return { error: "All 1,000 registration numbers have been used." };
 
     const registration = devCreateRegistration({
       event_id: resolved.event.id,
@@ -133,7 +136,7 @@ export async function persistRegistration(params: {
       email_updates: input.emailUpdates,
       payment_status: "paid",
       user_id: userId,
-      registration_code: generateRegistrationCode(),
+      registration_code: registrationCode,
     });
     if (razorpayOrderId || paymentId) devSetRegistrationPaymentRefs(registration.id, razorpayOrderId, paymentId);
     return { registrationId: registration.id, created: true };
@@ -174,20 +177,27 @@ export async function persistRegistration(params: {
 
   const hasCodeColumn = await hasRegistrationCodeColumn(supabase);
 
-  // Compute the next sequential number for this event.
   if (hasCodeColumn) {
     const { count } = await supabase
       .from("registrations")
       .select("id", { count: "exact", head: true })
       .eq("event_id", resolved.event.id)
       .eq("payment_status", "paid");
-    const seq = (count ?? 0) + 1;
-    row.seq_number = seq;
-    row.registration_code = sequentialCode(seq);
+    row.seq_number = (count ?? 0) + 1;
   }
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (hasCodeColumn && attempt > 0) row.registration_code = generateRegistrationCode();
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    if (hasCodeColumn) {
+      const { data: registrations, error: codesError } = await supabase.from("registrations").select("registration_code");
+      if (codesError) {
+        console.error("Unable to allocate a registration number", codesError);
+        return { error: "Could not allocate your registration number." };
+      }
+      const usedCodes = new Set((registrations ?? []).map((registration) => registration.registration_code).filter((code): code is string => typeof code === "string"));
+      const registrationCode = generateAvailableRegistrationCode(usedCodes);
+      if (!registrationCode) return { error: "All 1,000 registration numbers have been used." };
+      row.registration_code = registrationCode;
+    }
 
     const { data, error } = await supabase.from("registrations").insert(row).select("id").single();
     if (!error) return { registrationId: data.id, created: true };
@@ -228,6 +238,6 @@ export async function persistRegistration(params: {
     // Otherwise this was a registration_code collision - loop and try a new one.
   }
 
-  console.error("Unable to allocate a unique registration code after 3 attempts");
+  console.error("Unable to allocate a unique registration number after 10 attempts");
   return { error: "Could not save your registration." };
 }
